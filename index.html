@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HOPE PDF — Premium PDF Toolkit</title>
+<meta name="description" content="A premium, dark-themed PDF toolkit. Merge, split, compress, convert, edit, secure, and more — beautifully designed." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600;800&family=Inter:wght@300;400;500;600;700;800&family=Noto+Serif+JP:wght@500;700&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="style.css" />
+
+<link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' x2='1' y1='0' y2='1'><stop offset='0' stop-color='%23ffb1c8'/><stop offset='1' stop-color='%23e6b352'/></linearGradient></defs><g fill='url(%23g)'><circle cx='32' cy='14' r='9'/><circle cx='52' cy='26' r='9'/><circle cx='44' cy='48' r='9'/><circle cx='20' cy='48' r='9'/><circle cx='12' cy='26' r='9'/></g><circle cx='32' cy='32' r='5' fill='%23fff'/></svg>" />
+
+<!-- Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+
+<body data-theme="dark">
+
+  <!-- ─────────── Reusable SVG symbols ─────────── -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="hope-flower" viewBox="0 0 100 100">
+        <defs>
+          <radialGradient id="hf-petal" cx="40%" cy="40%" r="60%">
+            <stop offset="0" stop-color="#ffd6cf"/>
+            <stop offset=".55" stop-color="#f4a98c"/>
+            <stop offset="1" stop-color="#c87850"/>
+          </radialGradient>
+          <radialGradient id="hf-halo" cx="50%" cy="50%" r="50%">
+            <stop offset="0" stop-color="#f6e3a3" stop-opacity=".55"/>
+            <stop offset=".55" stop-color="#f48aa9" stop-opacity=".18"/>
+            <stop offset="1" stop-color="#f6e3a3" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="hf-core" cx="50%" cy="50%" r="50%">
+            <stop offset="0" stop-color="#fffaf0"/>
+            <stop offset=".7" stop-color="#fff1cc"/>
+            <stop offset="1" stop-color="#f6e3a3"/>
+          </radialGradient>
+        </defs>
+        <!-- glow halo -->
+        <circle cx="50" cy="50" r="48" fill="url(#hf-halo)"/>
+        <!-- 5 petals at 72° increments, slight tilt for natural look -->
+        <g transform="translate(50,50) rotate(-18)">
+          <circle cx="0"      cy="-22"  r="14" fill="url(#hf-petal)"/>
+          <circle cx="20.92"  cy="-6.8" r="14" fill="url(#hf-petal)"/>
+          <circle cx="12.93"  cy="17.8" r="14" fill="url(#hf-petal)"/>
+          <circle cx="-12.93" cy="17.8" r="14" fill="url(#hf-petal)"/>
+          <circle cx="-20.92" cy="-6.8" r="14" fill="url(#hf-petal)"/>
+          <!-- white core with warm gradient -->
+          <circle cx="0" cy="0" r="5.5" fill="url(#hf-core)"/>
+        </g>
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- Background layers -->
+  <div class="bg-glow" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <!-- Samurai-night scene (pure SVG, parallax-aware) -->
+  <div class="scene-night" id="scene-night" aria-hidden="true">
+    <svg class="scene-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice">
+      <defs>
+        <radialGradient id="horizonGlow" cx="50%" cy="92%" r="55%">
+          <stop offset="0" stop-color="#8c2c3c" stop-opacity=".34"/>
+          <stop offset=".55" stop-color="#3a141d" stop-opacity=".14"/>
+          <stop offset="1" stop-color="#000" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="moonHalo" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#f6e3a3" stop-opacity=".32"/>
+          <stop offset=".4" stop-color="#f6e3a3" stop-opacity=".10"/>
+          <stop offset="1" stop-color="#f6e3a3" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="mtFar" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#3a232a" stop-opacity=".55"/>
+          <stop offset="1" stop-color="#1a0e14" stop-opacity=".90"/>
+        </linearGradient>
+        <linearGradient id="mtMid" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#28161c" stop-opacity=".82"/>
+          <stop offset="1" stop-color="#0e0509" stop-opacity=".96"/>
+        </linearGradient>
+        <linearGradient id="mtNear" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#150a0e" stop-opacity=".96"/>
+          <stop offset="1" stop-color="#070306" stop-opacity="1"/>
+        </linearGradient>
+        <linearGradient id="fogBand" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="rgba(244,138,169,0)"/>
+          <stop offset=".55" stop-color="rgba(220,180,180,.12)"/>
+          <stop offset="1" stop-color="rgba(120,80,90,0)"/>
+        </linearGradient>
+        <filter id="castleBlur" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="1.2"/>
+        </filter>
+      </defs>
+
+      <!-- Soft ambient glow on horizon -->
+      <rect class="layer layer-glow" width="1600" height="900" fill="url(#horizonGlow)"/>
+
+      <!-- (Background moon halo removed — celestial toggle inside hero owns its own glow now) -->
+
+      <!-- Subtle stars (dark mode only — fade out in light mode) -->
+      <g class="layer layer-stars" fill="#fffae0">
+        <circle cx="120"  cy="80"  r="1"/>
+        <circle cx="280"  cy="140" r=".8"/>
+        <circle cx="440"  cy="60"  r="1.2"/>
+        <circle cx="600"  cy="120" r=".7"/>
+        <circle cx="760"  cy="50"  r=".9"/>
+        <circle cx="920"  cy="90"  r="1"/>
+        <circle cx="1320" cy="120" r=".8"/>
+        <circle cx="1480" cy="70"  r="1"/>
+        <circle cx="200"  cy="220" r=".6"/>
+        <circle cx="500"  cy="240" r=".7"/>
+        <circle cx="850"  cy="200" r=".8"/>
+        <circle cx="1380" cy="280" r=".7"/>
+      </g>
+
+      <!-- Far mountains (lightest, most fog) -->
+      <g class="layer layer-mt-far" data-parallax="0.04">
+        <path fill="url(#mtFar)" d="M0,640 L90,520 L210,610 L320,470 L460,580 L600,500 L760,590 L900,480 L1060,570 L1220,490 L1380,580 L1520,520 L1600,560 L1600,900 L0,900 Z"/>
+      </g>
+
+      <!-- Castle silhouette (mid-left, faint) — outer wrapper for parallax, inner for position -->
+      <g class="layer layer-castle" data-parallax="0.05">
+       <g transform="translate(330, 555)" opacity="0.18" filter="url(#castleBlur)">
+        <!-- base wall -->
+        <rect x="-30" y="50" width="120" height="22" fill="#0d0508"/>
+        <!-- main keep tower (3 tiers) -->
+        <rect x="0" y="22" width="60" height="32" fill="#0d0508"/>
+        <polygon points="-6,22 66,22 56,12 4,12" fill="#0d0508"/>
+        <rect x="10" y="-4" width="40" height="20" fill="#0d0508"/>
+        <polygon points="4,-4 56,-4 48,-14 12,-14" fill="#0d0508"/>
+        <rect x="20" y="-22" width="20" height="14" fill="#0d0508"/>
+        <polygon points="14,-22 46,-22 40,-32 20,-32" fill="#0d0508"/>
+        <rect x="29" y="-38" width="2" height="8" fill="#0d0508"/>
+        <!-- side tower -->
+        <rect x="74" y="34" width="22" height="24" fill="#0d0508"/>
+        <polygon points="70,34 100,34 95,26 75,26" fill="#0d0508"/>
+        <!-- subtle window glow -->
+        <rect x="26" y="-2" width="3" height="5" fill="#f6e3a3" opacity="0.55"/>
+        <rect x="32" y="-2" width="3" height="5" fill="#f6e3a3" opacity="0.55"/>
+       </g>
+      </g>
+
+      <!-- Mid mountains -->
+      <g class="layer layer-mt-mid" data-parallax="0.08">
+        <path fill="url(#mtMid)" d="M0,720 L140,580 L280,680 L420,560 L560,670 L720,580 L860,690 L1020,580 L1180,680 L1340,580 L1480,680 L1600,620 L1600,900 L0,900 Z"/>
+      </g>
+
+      <!-- Fog band near base -->
+      <rect class="layer layer-fog" x="0" y="640" width="1600" height="200" fill="url(#fogBand)" opacity="0.7"/>
+
+      <!-- Near mountains (darkest) -->
+      <g class="layer layer-mt-near" data-parallax="0.14">
+        <path fill="url(#mtNear)" d="M0,820 L160,720 L320,810 L480,700 L640,800 L820,700 L980,810 L1160,720 L1320,800 L1480,720 L1600,790 L1600,900 L0,900 Z"/>
+      </g>
+
+      <!-- Samurai is now drawn frame-by-frame onto #samurai-canvas (placed outside this SVG) -->
+      <!-- Subtle pink/gold ground halo where the samurai stands on the ridge -->
+      <ellipse class="layer" cx="248" cy="728" rx="38" ry="5" fill="#f48aa9" opacity="0.12"/>
+
+      <!-- Pixel bats (slow drift, very low opacity) -->
+      <g class="layer layer-bats" data-parallax="0.10" shape-rendering="crispEdges">
+        <g class="bat bat-1">
+          <rect x="0" y="0" width="2" height="1" fill="#0a0508"/>
+          <rect x="3" y="0" width="2" height="1" fill="#0a0508"/>
+          <rect x="2" y="1" width="1" height="1" fill="#0a0508"/>
+        </g>
+        <g class="bat bat-2">
+          <rect x="0" y="0" width="2" height="1" fill="#0a0508"/>
+          <rect x="3" y="0" width="2" height="1" fill="#0a0508"/>
+          <rect x="2" y="1" width="1" height="1" fill="#0a0508"/>
+        </g>
+        <g class="bat bat-3">
+          <rect x="0" y="0" width="2" height="1" fill="#0a0508"/>
+          <rect x="3" y="0" width="2" height="1" fill="#0a0508"/>
+          <rect x="2" y="1" width="1" height="1" fill="#0a0508"/>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <!-- Samurai pixel-sprite canvas — sits on top of the scene at fixed position.
+       Click → launches the Samurai vs Bats mini-game overlay. -->
+  <canvas id="samurai-canvas" class="samurai-canvas" role="button" tabindex="0"
+          aria-label="Play Samurai vs Bats mini-game"></canvas>
+
+  <canvas id="petal-canvas" aria-hidden="true"></canvas>
+  <div id="butterfly-layer" class="butterfly-layer" aria-hidden="true"></div>
+  <!-- Bat-with-quote layer (dark mode only) -->
+  <div id="bat-layer" class="bat-layer" aria-hidden="true"></div>
+
+
+  <!-- ─────────── Samurai vs Bats mini-game overlay ─────────── -->
+  <div id="game-overlay" class="game-overlay" aria-hidden="true" role="dialog" aria-label="Samurai vs Bats">
+    <div class="game-frame">
+      <header class="game-hud">
+        <div class="game-hud-l">
+          <span class="game-lives" id="game-lives" aria-label="Lives remaining">
+            <span class="g-heart">❤</span><span class="g-heart">❤</span><span class="g-heart">❤</span><span class="g-heart">❤</span><span class="g-heart">❤</span>
+          </span>
+        </div>
+        <div class="game-hud-c">
+          <strong class="game-title">SAMURAI <span>vs</span> BATS</strong>
+        </div>
+        <div class="game-hud-r">
+          <span class="game-score">SCORE <b id="game-score">0</b></span>
+          <button id="game-exit" class="game-exit-btn" aria-label="Exit game">✕</button>
+        </div>
+      </header>
+      <canvas id="game-canvas" class="game-canvas"></canvas>
+      <div class="game-touch" id="game-touch" aria-hidden="true">
+        <button class="g-touch g-left"  data-key="ArrowLeft"  aria-label="Move left">◀</button>
+        <button class="g-touch g-right" data-key="ArrowRight" aria-label="Move right">▶</button>
+        <button class="g-touch g-up"    data-key="ArrowUp"    aria-label="Jump">▲</button>
+        <button class="g-touch g-attack" data-key=" "         aria-label="Attack">⚔</button>
+      </div>
+      <div class="game-over" id="game-over" aria-hidden="true">
+        <h2>Game Over</h2>
+        <p>Final score <b id="game-final-score">0</b></p>
+        <div class="game-over-actions">
+          <button id="game-restart" class="btn btn-primary">Restart</button>
+          <button id="game-quit"    class="btn btn-ghost">Exit</button>
+        </div>
+      </div>
+      <div class="game-intro" id="game-intro" aria-hidden="true">
+        <h2>Samurai vs Bats</h2>
+        <p class="game-intro-sub">Defend the night. Avoid the bats. Strike when ready.</p>
+        <ul class="game-intro-keys">
+          <li><kbd>←</kbd><kbd>→</kbd> move</li>
+          <li><kbd>↑</kbd> jump</li>
+          <li><kbd>Space</kbd> attack</li>
+        </ul>
+        <button id="game-start" class="btn btn-primary">Begin</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────── HEADER ─────────── -->
+  <header class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="#home" class="brand" data-link>
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="32" height="32">
+            <defs>
+              <linearGradient id="bg1" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stop-color="#ffb1c8"/><stop offset="1" stop-color="#e6b352"/>
+              </linearGradient>
+            </defs>
+            <g fill="url(#bg1)">
+              <circle cx="32" cy="14" r="8"/><circle cx="52" cy="26" r="8"/>
+              <circle cx="44" cy="48" r="8"/><circle cx="20" cy="48" r="8"/>
+              <circle cx="12" cy="26" r="8"/>
+            </g>
+            <circle cx="32" cy="32" r="4.5" fill="#fff"/>
+          </svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-title">H<span class="brand-flower"><svg class="hope-flower-svg" aria-hidden="true"><use href="#hope-flower"/></svg></span>PE PDF</span>
+        </span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#" class="nav-link" data-jump-tool="merge">MERGE PDF</a>
+        <a href="#" class="nav-link" data-jump-tool="split">SPLIT PDF</a>
+        <a href="#" class="nav-link" data-jump-tool="compress">COMPRESS PDF</a>
+
+        <div class="nav-dd">
+          <button class="nav-link nav-dd-trigger">CONVERT PDF
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-dd-panel">
+            <a href="#" data-jump-tool="jpg2pdf">JPG to PDF</a>
+            <a href="#" data-jump-tool="word2pdf">Word to PDF</a>
+            <a href="#" data-jump-tool="pdf2word">PDF to Word</a>
+            <a href="#" data-jump-tool="pdf2jpg">PDF to JPG</a>
+            <a href="#" data-jump-tool="html2pdf">HTML to PDF</a>
+          </div>
+        </div>
+
+        <div class="nav-dd nav-dd-mega">
+          <button class="nav-link nav-dd-trigger">ALL PDF TOOLS
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="mega-panel">
+            <div class="mega-col">
+              <h5>Organize PDF</h5>
+              <a href="#" data-jump-tool="merge"><span class="mc-dot organize"></span>Merge PDF</a>
+              <a href="#" data-jump-tool="split"><span class="mc-dot organize"></span>Split PDF</a>
+              <a href="#" data-jump-tool="remove-pages"><span class="mc-dot organize"></span>Remove pages</a>
+              <a href="#" data-jump-tool="extract-pages"><span class="mc-dot organize"></span>Extract pages</a>
+              <a href="#" data-jump-tool="organize"><span class="mc-dot organize"></span>Organize PDF</a>
+              <a href="#" data-jump-tool="scan2pdf"><span class="mc-dot organize"></span>Scan to PDF</a>
+            </div>
+            <div class="mega-col">
+              <h5>Optimize PDF</h5>
+              <a href="#" data-jump-tool="compress"><span class="mc-dot optimize"></span>Compress PDF</a>
+              <a href="#" data-jump-tool="repair"><span class="mc-dot optimize"></span>Repair PDF</a>
+              <a href="#" data-jump-tool="ocr"><span class="mc-dot optimize"></span>OCR PDF</a>
+            </div>
+            <div class="mega-col">
+              <h5>Convert to PDF</h5>
+              <a href="#" data-jump-tool="jpg2pdf"><span class="mc-dot convert"></span>JPG to PDF</a>
+              <a href="#" data-jump-tool="word2pdf"><span class="mc-dot convert"></span>Word to PDF</a>
+              <a href="#" data-jump-tool="ppt2pdf"><span class="mc-dot convert"></span>PowerPoint to PDF</a>
+              <a href="#" data-jump-tool="excel2pdf"><span class="mc-dot convert"></span>Excel to PDF</a>
+              <a href="#" data-jump-tool="html2pdf"><span class="mc-dot convert"></span>HTML to PDF</a>
+            </div>
+            <div class="mega-col">
+              <h5>Convert from PDF</h5>
+              <a href="#" data-jump-tool="pdf2jpg"><span class="mc-dot convert"></span>PDF to JPG</a>
+              <a href="#" data-jump-tool="pdf2word"><span class="mc-dot convert"></span>PDF to Word</a>
+              <a href="#" data-jump-tool="pdf2ppt"><span class="mc-dot convert"></span>PDF to PowerPoint</a>
+              <a href="#" data-jump-tool="pdf2excel"><span class="mc-dot convert"></span>PDF to Excel</a>
+              <a href="#" data-jump-tool="pdf2pdfa"><span class="mc-dot convert"></span>PDF to PDF/A</a>
+            </div>
+            <div class="mega-col">
+              <h5>Edit PDF</h5>
+              <a href="#" data-jump-tool="rotate"><span class="mc-dot edit"></span>Rotate PDF</a>
+              <a href="#" data-jump-tool="page-numbers"><span class="mc-dot edit"></span>Add page numbers</a>
+              <a href="#" data-jump-tool="watermark"><span class="mc-dot edit"></span>Add watermark</a>
+              <a href="#" data-jump-tool="crop"><span class="mc-dot edit"></span>Crop PDF</a>
+              <a href="#" data-jump-tool="edit-pdf"><span class="mc-dot edit"></span>Edit PDF</a>
+            </div>
+            <div class="mega-col">
+              <h5>PDF Security</h5>
+              <a href="#" data-jump-tool="unlock"><span class="mc-dot security"></span>Unlock PDF</a>
+              <a href="#" data-jump-tool="protect"><span class="mc-dot security"></span>Protect PDF</a>
+              <a href="#" data-jump-tool="sign"><span class="mc-dot security"></span>Sign PDF</a>
+              <a href="#" data-jump-tool="redact"><span class="mc-dot security"></span>Redact PDF</a>
+              <a href="#" data-jump-tool="compare"><span class="mc-dot security"></span>Compare PDF</a>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div class="nav-actions">
+        <div class="nav-search" role="search">
+          <label class="nav-search-wrap" for="tool-search">
+            <svg class="nav-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="M21 21l-4.3-4.3"/>
+            </svg>
+            <input id="tool-search" class="nav-search-input" type="search" placeholder="Search tools…" autocomplete="off" aria-label="Search tools" />
+            <kbd class="nav-search-kbd" aria-hidden="true">/</kbd>
+          </label>
+          <div id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></div>
+        </div>
+        <button id="sound-toggle" class="icon-btn muted" aria-label="Toggle ambient wind sound" title="Toggle wind sound">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path class="sound-wave" d="M15.54 8.46a5 5 0 010 7.07"/><path class="sound-wave" d="M19.07 4.93a10 10 0 010 14.14"/></svg>
+        </button>
+        <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme" title="Light / Dark">
+          <svg class="ic-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="ic-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        </button>
+        <button id="mobile-menu" class="icon-btn mobile-only" aria-label="Open menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter pill bar (sticky) -->
+    <div class="filter-bar" id="filter-bar">
+      <div class="filter-inner">
+        <button class="pill is-active" data-filter="all">All</button>
+        <button class="pill" data-filter="workflow">Workflows</button>
+        <button class="pill" data-filter="organize">Organize PDF</button>
+        <button class="pill" data-filter="optimize">Optimize PDF</button>
+        <button class="pill" data-filter="convert">Convert PDF</button>
+        <button class="pill" data-filter="edit">Edit PDF</button>
+        <button class="pill" data-filter="security">PDF Security</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ─────────── HERO ─────────── -->
+    <section id="home" class="hero">
+      <!-- Clickable celestial toggle anchored to the hero (mid-right) -->
+      <button id="celestial-toggle" class="celestial-toggle" type="button" aria-label="Switch to Light Mode" title="Switch to Light Mode">
+        <span class="celestial-glow" aria-hidden="true"></span>
+        <svg class="celestial-moon" viewBox="0 0 100 100" aria-hidden="true">
+          <defs>
+            <radialGradient id="cMoonFill" cx="35%" cy="35%" r="70%">
+              <stop offset="0" stop-color="#fffae0"/>
+              <stop offset=".55" stop-color="#f6e3a3"/>
+              <stop offset="1" stop-color="#c89b3c"/>
+            </radialGradient>
+          </defs>
+          <circle cx="50" cy="50" r="34" fill="url(#cMoonFill)"/>
+          <circle cx="40" cy="42" r="4" fill="#c89b3c" opacity=".25"/>
+          <circle cx="58" cy="55" r="3" fill="#c89b3c" opacity=".22"/>
+          <circle cx="48" cy="62" r="2.4" fill="#c89b3c" opacity=".18"/>
+        </svg>
+        <svg class="celestial-sun" viewBox="0 0 100 100" aria-hidden="true">
+          <defs>
+            <radialGradient id="cSunFill" cx="40%" cy="40%" r="60%">
+              <stop offset="0" stop-color="#fff7c2"/>
+              <stop offset=".6" stop-color="#ffc857"/>
+              <stop offset="1" stop-color="#e8842b"/>
+            </radialGradient>
+          </defs>
+          <g class="sun-rays">
+            <line x1="50" y1="6"  x2="50" y2="18" stroke="#e8842b" stroke-width="3" stroke-linecap="round"/>
+            <line x1="50" y1="82" x2="50" y2="94" stroke="#e8842b" stroke-width="3" stroke-linecap="round"/>
+            <line x1="6"  y1="50" x2="18" y2="50" stroke="#e8842b" stroke-width="3" stroke-linecap="round"/>
+            <line x1="82" y1="50" x2="94" y2="50" stroke="#e8842b" stroke-width="3" stroke-linecap="round"/>
+            <line x1="18" y1="18" x2="27" y2="27" stroke="#e8842b" stroke-width="3" stroke-linecap="round"/>
+            <line x1="73" y1="73" x2="82" y2="82" stroke="#e8842b" stroke-width="3" stroke-linecap="round"/>
+            <line x1="82" y1="18" x2="73" y2="27" stroke="#e8842b" stroke-width="3" stroke-linecap="round"/>
+            <line x1="18" y1="82" x2="27" y2="73" stroke="#e8842b" stroke-width="3" stroke-linecap="round"/>
+          </g>
+          <circle cx="50" cy="50" r="22" fill="url(#cSunFill)"/>
+        </svg>
+      </button>
+      <div class="hero-inner reveal">
+        <p class="kanji" aria-hidden="true">希望</p>
+        <h1 class="hero-title">
+          The PDF toolkit, <span class="grad">H<span class="hero-flower"><svg class="hope-flower-svg hope-flower-lg" aria-hidden="true"><use href="#hope-flower"/></svg></span>PE</span>.
+        </h1>
+        <div class="hero-cta">
+          <a href="#tools" class="btn btn-primary" data-link>
+            <span>Explore Tools</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </a>
+          <a href="#tools" class="btn btn-ghost" data-link>How it works</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────── TOOLS GRID ─────────── -->
+    <section id="tools" class="tools">
+      <header class="section-head reveal">
+        <p class="eyebrow">道具 · The Tools</p>
+        <h2>Every PDF tool in one place</h2>
+        <p class="lede">Curated, beautifully crafted, and elegantly fast.</p>
+      </header>
+
+      <div class="tool-grid" id="tool-grid">
+        <!-- Cards rendered by JS for filter/sort -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ─────────── FOOTER ─────────── -->
+  <footer class="foot">
+    <div class="foot-inner">
+      <div class="foot-brand">
+        <div class="brand">
+          <span class="brand-mark"><svg viewBox="0 0 64 64" width="28" height="28"><g fill="url(#bg1)"><circle cx="32" cy="14" r="8"/><circle cx="52" cy="26" r="8"/><circle cx="44" cy="48" r="8"/><circle cx="20" cy="48" r="8"/><circle cx="12" cy="26" r="8"/></g><circle cx="32" cy="32" r="4.5" fill="#fff"/></svg></span>
+          <span class="brand-title">H<span class="brand-flower"><svg class="hope-flower-svg" aria-hidden="true"><use href="#hope-flower"/></svg></span>PE PDF</span>
+        </div>
+        <p class="foot-tag">A premium PDF studio. Quietly powerful.</p>
+      </div>
+      <div class="foot-cols">
+        <div><h6>Product</h6><a href="#tools">All tools</a><a href="#tools">Workflows</a><a href="#tools">Releases</a></div>
+        <div><h6>Resources</h6><a href="#">Help center</a><a href="#">Tutorials</a><a href="#">Blog</a><a href="#">API docs</a></div>
+        <div><h6>Solutions</h6><a href="#">For business</a><a href="#">For students</a><a href="#">Legal teams</a><a href="#">Education</a></div>
+        <div><h6>Legal</h6><a href="#" data-show="privacy">Privacy</a><a href="#" data-show="terms">Terms</a><a href="#">Cookies</a><a href="#">Security</a></div>
+        <div><h6>Company</h6><a href="#">About</a><a href="#">Careers</a><a href="#">Contact</a><a href="#">Press</a></div>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <p>© <span id="footYear"></span> H<span class="brand-flower"><svg class="hope-flower-svg hope-flower-sm" aria-hidden="true"><use href="#hope-flower"/></svg></span>PE PDF · Crafted with care.</p>
+    </div>
+  </footer>
+
+  <!-- ─────────── TOOL WORKSPACE MODAL ─────────── -->
+  <div id="workspace" class="workspace" aria-hidden="true">
+    <div class="workspace-backdrop" data-close></div>
+    <div class="workspace-panel" role="dialog" aria-modal="true" aria-labelledby="ws-title">
+      <header class="ws-head">
+        <div class="ws-title-wrap">
+          <h2 id="ws-title">Tool</h2>
+          <p id="ws-sub">Description</p>
+        </div>
+        <div class="ws-head-actions">
+          <button class="icon-btn" id="undo-btn" title="Undo (Ctrl+Z)" aria-label="Undo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-15-6.7L3 13"/></svg>
+          </button>
+          <button class="icon-btn" id="redo-btn" title="Redo (Ctrl+Y)" aria-label="Redo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0115-6.7L21 13"/></svg>
+          </button>
+          <button class="icon-btn ws-close" data-close aria-label="Close tool" title="Close (Esc)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Drop zone -->
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Click or drop files to upload">
+        <div class="dz-rings"><span></span><span></span><span></span></div>
+        <div class="dz-content">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          <h3 id="dz-title">Drop your PDF here</h3>
+          <p id="dz-sub">or click to browse</p>
+          <input id="file-input" type="file" multiple hidden />
+        </div>
+      </div>
+
+      <!-- Selected files preview -->
+      <ul id="file-list" class="file-list" aria-live="polite"></ul>
+
+      <!-- Per-tool options -->
+      <div id="options" class="options"></div>
+
+      <div class="ws-footer">
+        <div class="ws-meta" id="ws-meta"></div>
+        <div class="ws-actions">
+          <button id="clear-btn" class="btn btn-ghost">Clear</button>
+          <button id="run-btn" class="btn btn-primary" disabled>
+            <span class="btn-label">Process</span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Recent files -->
+      <div class="recent" id="recent">
+        <h5>Recent</h5>
+        <ul id="recent-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────── PDF PREVIEW MODAL ─────────── -->
+  <div id="preview-modal" class="preview-modal" aria-hidden="true">
+    <div class="preview-backdrop" data-close-preview></div>
+    <div class="preview-panel">
+      <header class="preview-head">
+        <h3 id="preview-title">Preview</h3>
+        <button class="icon-btn" data-close-preview aria-label="Close preview"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </header>
+      <div class="preview-body" id="preview-body"></div>
+    </div>
+  </div>
+
+  <!-- ─────────── CONSENT MODAL (first-time only) ─────────── -->
+  <div id="consent-modal" class="consent-modal" aria-hidden="true">
+    <div class="consent-backdrop"></div>
+    <div class="consent-panel" role="dialog" aria-modal="true" aria-labelledby="consent-title">
+      <div class="consent-bloom" aria-hidden="true"><svg class="hope-flower-svg hope-flower-xl"><use href="#hope-flower"/></svg></div>
+      <h2 id="consent-title">Before You Continue</h2>
+      <ul class="consent-list">
+        <li>Your files are processed securely.</li>
+        <li>Please avoid uploading sensitive or confidential documents.</li>
+        <li>This tool is currently free to use.</li>
+        <li>We may introduce ads in the future to support development.</li>
+        <li>H<span class="brand-flower"><svg class="hope-flower-svg hope-flower-sm"><use href="#hope-flower"/></svg></span>pe you will support us ❤️</li>
+      </ul>
+      <label class="consent-check">
+        <input type="checkbox" id="consent-check" />
+        <span class="cc-box" aria-hidden="true"></span>
+        <span>I have read and agree to the terms above.</span>
+      </label>
+      <p class="consent-hint" id="consent-hint">Please confirm to continue</p>
+      <div class="consent-links">
+        <a href="#" data-show="privacy">Privacy Policy</a>
+        <span>·</span>
+        <a href="#" data-show="terms">Terms of Service</a>
+      </div>
+      <button id="consent-btn" class="btn btn-primary consent-btn" disabled>
+        <span>I Understand &amp; Continue</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ─────────── INFO MODAL (privacy/terms) ─────────── -->
+  <div id="info-modal" class="info-modal" aria-hidden="true">
+    <div class="info-backdrop" data-close-info></div>
+    <div class="info-panel">
+      <header class="info-head">
+        <h3 id="info-title">Privacy</h3>
+        <button class="icon-btn" data-close-info aria-label="Close"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </header>
+      <div class="info-body" id="info-body"></div>
+    </div>
+  </div>
+
+  <!-- ─────────── QUOTE POPUP ─────────── -->
+  <div id="quote-popup" class="quote-popup" aria-hidden="true">
+    <div class="quote-card">
+      <button class="icon-btn quote-close" id="quote-close" aria-label="Close quote">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="quote-flag" id="quote-flag">🌸</div>
+      <blockquote id="quote-text"></blockquote>
+      <p class="quote-trans" id="quote-trans"></p>
+      <p class="quote-author" id="quote-author"></p>
+    </div>
+  </div>
+
+  <!-- ─────────── CHATBOT ─────────── -->
+  <button id="chat-fab" class="chat-fab" aria-label="Open chat assistant">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 11.5a8.5 8.5 0 01-13 7.2L3 20l1.4-4.5A8.5 8.5 0 1121 11.5z"/>
+    </svg>
+    <span class="chat-fab-pulse"></span>
+  </button>
+
+  <div id="chat-window" class="chat-window" aria-hidden="true">
+    <header class="chat-head">
+      <div class="chat-avatar">
+        <svg width="22" height="22" viewBox="0 0 64 64"><g fill="url(#bg1)"><circle cx="32" cy="14" r="8"/><circle cx="52" cy="26" r="8"/><circle cx="44" cy="48" r="8"/><circle cx="20" cy="48" r="8"/><circle cx="12" cy="26" r="8"/></g><circle cx="32" cy="32" r="4.5" fill="#fff"/></svg>
+      </div>
+      <div class="chat-id">
+        <strong>H<span class="brand-flower"><svg class="hope-flower-svg hope-flower-sm"><use href="#hope-flower"/></svg></span>PE Assistant</strong>
+        <span><span class="status-dot"></span>Online — here to help</span>
+      </div>
+      <button class="icon-btn" id="chat-close" aria-label="Close chat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <div class="chat-body" id="chat-body"></div>
+    <div class="chat-quick" id="chat-quick">
+      <button data-q="merge">Merge PDF</button>
+      <button data-q="compress">Compress PDF</button>
+      <button data-q="convert">Convert PDF</button>
+      <button data-q="error">Fix error</button>
+    </div>
+    <form class="chat-form" id="chat-form">
+      <input id="chat-input" type="text" placeholder="Ask me anything about your PDF..." autocomplete="off" />
+      <button type="submit" class="chat-send" aria-label="Send">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      </button>
+    </form>
+  </div>
+
+  <!-- Floating greeting bubble -->
+  <div id="chat-greet" class="chat-greet" aria-hidden="true">
+    Hi! Need help with your PDF?
+  </div>
+
+  <!-- ─────────── TOAST CONTAINER ─────────── -->
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+  <!-- Scripts -->
+  <script src="quotes.js"></script>
+  <script src="script.js"></script>
+  <script src="tools.js"></script>
+</body>
+</html>
