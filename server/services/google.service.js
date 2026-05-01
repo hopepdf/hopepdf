@@ -35,11 +35,16 @@ async function verifyIdToken(idToken) {
 /* (b) Passport strategy — registered only when secrets are present so
  *      a missing GOOGLE_CLIENT_SECRET in dev doesn't crash the server. */
 if (env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  // Use the absolute URL when set (recommended on production behind a
+  // proxy like Render — relative URLs can resolve to http://… and
+  // trigger Google's redirect_uri_mismatch / invalid_client errors).
+  const callbackURL = process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback';
   passport.use(new GoogleStrategy(
     {
       clientID:     env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL:  '/auth/google/callback'
+      callbackURL,
+      proxy:        true
     },
     (accessToken, refreshToken, profile, done) => {
       try {

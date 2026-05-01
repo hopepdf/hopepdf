@@ -220,18 +220,35 @@ const API_URL = "https://hopepdf-api.onrender.com";
 
 document.addEventListener("DOMContentLoaded", () => {
   // 1) The standalone "Continue with Google" button → server redirect flow
-  const btn = document.getElementById("googleLoginBtn");
-  if (btn) {
-    btn.addEventListener("click", () => {
-      window.location.href = `${API_URL}/auth/google`;
-    });
-  }
+  
 
   // 2) The GIS pop-up container (handled by HopeAuth.initGoogle)
   const container = document.getElementById("googleSignInContainer");
   if (container && window.HopeAuth && HopeAuth.initGoogle) {
     HopeAuth.initGoogle(container);
   }
+  async function handleCredential(resp) {
+  try {
+    const r = await fetch("https://hopepdf-api.onrender.com/auth/google", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        idToken: resp.credential
+      })
+    });
+
+    const data = await r.json();
+
+    if (data.ok) {
+      localStorage.setItem("hope.user", JSON.stringify(data.user));
+      location.reload();
+    }
+  } catch (err) {
+    console.error("Login failed", err);
+  }
+}
 
   // 3) Pick up ?token=… returned by the OAuth callback and seed HopeAuth
   //    so the existing plan + badge UI updates without a second sign-in.
