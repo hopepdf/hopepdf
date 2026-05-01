@@ -1,18 +1,21 @@
 /* Plan-aware request gate (runs AFTER multer).
  *
- *   FREE:
+ *   FREE plan:
  *     • exactly 1 file per request
- *     • each file ≤ FREE_MAX_FILE_MB
+ *     • EXCEPT routes that opt in with { allowMulti: true } (e.g. merge)
  *
- *   PREMIUM:
+ *   PREMIUM plan:
  *     • multiple files allowed
- *     • each file ≤ PREMIUM_MAX_FILE_MB
+ *     • parallel processing handled in the controllers
  *
- * If a request violates the plan, all uploaded files are deleted
- * before the error response is sent.
+ *   No file-size cap is enforced here — per spec, large files are
+ *   accepted. (Multer in upload.middleware.js also leaves size open.)
+ *
+ *   Usage in routes:
+ *     enforcePlanLimits()              // default: free=1, premium=many
+ *     enforcePlanLimits({ allowMulti }) // bypass count rule (merge)
  */
 const { cleanupRequest } = require('../utils/cleanup');
-const env = require('../config/env');
 
 function getFiles(req) {
   if (Array.isArray(req.files) && req.files.length) return req.files;
@@ -20,40 +23,29 @@ function getFiles(req) {
   return [];
 }
 
-function enforcePlanLimits(req, res, next) {
-  const user = req.user;
-  const plan = (user && user.plan) || 'free';
-  const isPremium = plan !== 'free';
-  const files = getFiles(req);
+function enforcePlanLimits(opts = {}) {
+  const { allowMulti = false } = opts;
+  return function plan(req, res, next) {
+    const user = req.user;
+    const isPremium = !!user && user.plan && user.plan !== 'free';
+    const files = getFiles(req);
 
-  if (!files.length) {
-    return res.status(400).json({ ok: false, error: 'No files uploaded.' });
-  }
+    if (!files.length) {
+      return res.status(400).json({ ok: false, error: 'No files uploaded.' });
+    }
 
-  // 1) file-count rule
-  if (!isPremium && files.length > 1) {
-    cleanupRequest(req);
-    return res.status(403).json({
-      ok: false,
-      code: 'PLAN_LIMIT',
-      error: 'Free plan: 1 file per request. Upgrade to Premium for batch processing.'
-    });
-  }
+    // File-count rule (skipped for tools that explicitly opt in, e.g. merge).
+    if (!allowMulti && !isPremium && files.length > 1) {
+      cleanupRequest(req);
+      return res.status(403).json({
+        ok: false,
+        code: 'PLAN_LIMIT',
+        message: 'Free plan allows only 1 file at a time. Upgrade for batch processing.'
+      });
+    }
 
-  // 2) per-file size cap
-  const capMB = isPremium ? env.PREMIUM_MAX_FILE_MB : env.FREE_MAX_FILE_MB;
-  const cap = capMB * 1024 * 1024;
-  const tooBig = files.find(f => f.size > cap);
-  if (tooBig) {
-    cleanupRequest(req);
-    return res.status(413).json({
-      ok: false,
-      code: 'FILE_TOO_LARGE',
-      error: `${tooBig.originalname} exceeds the ${capMB} MB ${plan} limit${!isPremium ? ' — upgrade for 100 MB.' : '.'}`
-    });
-  }
-
-  next();
+    next();
+  };
 }
 
 module.exports = { enforcePlanLimits };

@@ -202,3 +202,68 @@ window.HopeAuth = (() => {
     startCheckout, onChange
   };
 })();
+
+/* ================================================================
+ * Google OAuth — redirect flow (server-side code exchange)
+ *
+ * Lives OUTSIDE the HopeAuth IIFE so it runs at DOM ready without
+ * touching any of the existing HopeAuth state.
+ *
+ *   1) #googleLoginBtn  → window.location → backend /auth/google
+ *   2) Backend redirects to Google, then back to /auth/google/callback
+ *   3) Backend issues a JWT and redirects FRONTEND_URL?token=…
+ *   4) On the next page load we read ?token= from the URL, decode the
+ *      embedded user, hand it to HopeAuth so the plan/badge stays
+ *      consistent, then strip the token from the URL.
+ * ================================================================ */
+const API_URL = "https://hopepdf-api.onrender.com";
+
+document.addEventListener("DOMContentLoaded", () => {
+  // 1) The standalone "Continue with Google" button → server redirect flow
+  const btn = document.getElementById("googleLoginBtn");
+  if (btn) {
+    btn.addEventListener("click", () => {
+      window.location.href = `${API_URL}/auth/google`;
+    });
+  }
+
+  // 2) The GIS pop-up container (handled by HopeAuth.initGoogle)
+  const container = document.getElementById("googleSignInContainer");
+  if (container && window.HopeAuth && HopeAuth.initGoogle) {
+    HopeAuth.initGoogle(container);
+  }
+
+  // 3) Pick up ?token=… returned by the OAuth callback and seed HopeAuth
+  //    so the existing plan + badge UI updates without a second sign-in.
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (token && window.HopeAuth) {
+      const payload = token.split(".")[1];
+      if (payload) {
+        const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+        const profile = JSON.parse(decodeURIComponent(escape(json)));
+        if (profile && profile.email) {
+          const existing = window.HopeAuth.getUser() || {};
+          // Use saveUser via the public surface — no IIFE state mutation.
+          if (window.HopeAuth.PLANS) {
+            localStorage.setItem("user", JSON.stringify(profile));
+            localStorage.setItem("hope.user", JSON.stringify({
+              email: profile.email,
+              name:  profile.name || profile.email,
+              picture: profile.picture || null,
+              role:  profile.role || "user",
+              plan:  existing.plan || "free",
+              expiresAt: existing.expiresAt || null,
+              ts: Date.now()
+            }));
+          }
+          // Strip the token from the URL so it isn't bookmarked.
+          params.delete("token");
+          const clean = window.location.pathname + (params.toString() ? `?${params}` : "") + window.location.hash;
+          window.history.replaceState({}, document.title, clean);
+        }
+      }
+    }
+  } catch (_) { /* ignore — token parse is best-effort */ }
+});

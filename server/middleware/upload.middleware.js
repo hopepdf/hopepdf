@@ -16,7 +16,6 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
-const env = require('../config/env');
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -48,11 +47,12 @@ function fileFilter(_req, file, cb) {
   cb(null, true);
 }
 
-// 100 MB ceiling — per-plan cap is enforced in plan.middleware.
+// No file-size cap (per spec). Count-only cap so merge requests can't
+// abuse the server with thousands of attachments.
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: env.PREMIUM_MAX_FILE_MB * 1024 * 1024, files: 20 }
+  limits: { files: 50 }
 });
 
 module.exports = {

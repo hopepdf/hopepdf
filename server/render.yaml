@@ -4,7 +4,9 @@ services:
     name: hope-pdf-server
     env: node
     rootDir: server
-    buildCommand: npm install
+    # LibreOffice is required for PDF↔Word real conversion.
+    # Render base images are Debian — apt-get works at build time.
+    buildCommand: apt-get update && apt-get install -y --no-install-recommends libreoffice-core libreoffice-writer && npm install
     startCommand: npm start
     healthCheckPath: /healthz
     autoDeploy: true
@@ -12,6 +14,12 @@ services:
       - key: NODE_ENV
         value: production
       - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
         sync: false
       - key: RAZORPAY_KEY_ID
         sync: false

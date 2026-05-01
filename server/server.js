@@ -19,6 +19,7 @@ const corsMiddleware = require('./config/cors');
 const { global: globalLimiter } = require('./middleware/ratelimit.middleware');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 const logger = require('./utils/logger');
+const passport = require('./services/google.service'); // passport instance + verifyIdToken
 
 const authRoutes    = require('./routes/auth.routes');
 const pdfRoutes     = require('./routes/pdf.routes');
@@ -36,6 +37,9 @@ app.use(morgan(env.NODE_ENV === 'production' ? 'tiny' : 'dev'));
 
 // global throttle (each route adds its own processing limit on top)
 app.use(globalLimiter);
+
+// passport — needed for the Google OAuth redirect flow (no sessions)
+app.use(passport.initialize());
 
 // JSON only for routes that don't take multipart uploads.
 // (Multer routes parse the body themselves.)

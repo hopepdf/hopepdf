@@ -739,20 +739,31 @@
           toast('info', 'Signed out', 'Come back any time.');
         });
       } else {
-        // Render the existing "Continue with Google" button (no UI change)
-        // and wire it to Google Identity Services using the real client ID.
-        authSlot.innerHTML = `
-          <button type="button" class="g-fallback-btn" id="g-login-btn">
-            <span class="g-mark" aria-hidden="true">G</span> Continue with Google
-          </button>`;
-        initGoogleSignIn();
-        $('#g-login-btn').addEventListener('click', () => {
-          if (window.google && window.google.accounts && window.google.accounts.id) {
-            window.google.accounts.id.prompt();
-          } else {
-            toast('error', 'Google not loaded', 'Check your connection and refresh.');
+        // The new HTML layout already provides #googleSignInContainer
+        // (for GIS pop-up) and #googleLoginBtn (for the redirect flow),
+        // both wired in auth.js. Don't wipe them — just initialize GIS
+        // into the inner container if it's there, otherwise fall back
+        // to the legacy single-slot rendering.
+        const innerGis = authSlot.querySelector('#googleSignInContainer');
+        if (innerGis) {
+          initGoogleSignIn();
+          if (window.HopeAuth && window.HopeAuth.initGoogle) {
+            window.HopeAuth.initGoogle(innerGis);
           }
-        });
+        } else {
+          authSlot.innerHTML = `
+            <button type="button" class="g-fallback-btn" id="g-login-btn">
+              <span class="g-mark" aria-hidden="true">G</span> Continue with Google
+            </button>`;
+          initGoogleSignIn();
+          $('#g-login-btn').addEventListener('click', () => {
+            if (window.google && window.google.accounts && window.google.accounts.id) {
+              window.google.accounts.id.prompt();
+            } else {
+              toast('error', 'Google not loaded', 'Check your connection and refresh.');
+            }
+          });
+        }
       }
     }
 
