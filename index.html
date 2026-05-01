@@ -3,8 +3,24 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>HOPE PDF — Premium PDF Toolkit</title>
-<meta name="description" content="A premium, dark-themed PDF toolkit. Merge, split, compress, convert, edit, secure, and more — beautifully designed." />
+<title>H🌸PE PDF — Free PDF Toolkit · Merge, Split, Compress, Convert</title>
+<meta name="description" content="H🌸PE PDF is a privacy-first PDF toolkit. Merge, split, compress, convert PDF↔Word, JPG↔PDF and more — all in your browser, nothing uploaded." />
+<meta name="keywords" content="pdf toolkit, merge pdf, split pdf, compress pdf, pdf to word, word to pdf, jpg to pdf, html to pdf, free pdf tools" />
+<meta name="author" content="H🌸PE PDF" />
+<meta name="robots" content="index,follow" />
+<link rel="canonical" href="https://hope-pdf.app/" />
+
+<!-- Open Graph / Twitter -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="H🌸PE PDF — Free PDF Toolkit" />
+<meta property="og:description" content="Privacy-first, browser-native PDF tools with a samurai twist." />
+<meta property="og:url" content="https://hope-pdf.app/" />
+<meta property="og:image" content="https://hope-pdf.app/assets/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="H🌸PE PDF — Free PDF Toolkit" />
+<meta name="twitter:description" content="Merge, split, compress, convert. Your files never leave the browser." />
+<meta name="theme-color" content="#0e0f14" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#f5f4f7" media="(prefers-color-scheme: light)" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,13 +30,35 @@
 
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' x2='1' y1='0' y2='1'><stop offset='0' stop-color='%23ffb1c8'/><stop offset='1' stop-color='%23e6b352'/></linearGradient></defs><g fill='url(%23g)'><circle cx='32' cy='14' r='9'/><circle cx='52' cy='26' r='9'/><circle cx='44' cy='48' r='9'/><circle cx='20' cy='48' r='9'/><circle cx='12' cy='26' r='9'/></g><circle cx='32' cy='32' r='5' fill='%23fff'/></svg>" />
 
-<!-- Libraries -->
+<!-- Tooling libraries (load BEFORE app scripts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<!-- Auth + payments -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
+
+<!-- JSON-LD for SEO -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "H🌸PE PDF",
+  "description": "Privacy-first PDF toolkit running entirely in the browser.",
+  "applicationCategory": "Productivity",
+  "operatingSystem": "Any",
+  "offers": [
+    { "@type": "Offer", "price": "0",   "priceCurrency": "INR", "name": "Free" },
+    { "@type": "Offer", "price": "150", "priceCurrency": "INR", "name": "Premium Monthly" },
+    { "@type": "Offer", "price": "1000","priceCurrency": "INR", "name": "Premium Yearly" }
+  ]
+}
+</script>
 </head>
 
 <body data-theme="dark">
@@ -342,6 +380,11 @@
       </nav>
 
       <div class="nav-actions">
+        <!-- Plan + auth (wired by auth.js / script.js) -->
+        <span class="plan-badge" id="plan-badge" title="Your current plan">Free</span>
+        <button id="upgrade-btn" class="ghost-pill" type="button" title="See plans">Upgrade</button>
+        <div id="auth-slot" class="auth-slot" aria-label="Account"></div>
+
         <div class="nav-search" role="search">
           <label class="nav-search-wrap" for="tool-search">
             <svg class="nav-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -367,15 +410,15 @@
     </div>
 
     <!-- Filter pill bar (sticky) -->
+    <!-- Filter pills aligned with the homepage buckets in tools.js
+         (homepageBucket: pdf | word | image | others) -->
     <div class="filter-bar" id="filter-bar">
       <div class="filter-inner">
         <button class="pill is-active" data-filter="all">All</button>
-        <button class="pill" data-filter="workflow">Workflows</button>
-        <button class="pill" data-filter="organize">Organize PDF</button>
-        <button class="pill" data-filter="optimize">Optimize PDF</button>
-        <button class="pill" data-filter="convert">Convert PDF</button>
-        <button class="pill" data-filter="edit">Edit PDF</button>
-        <button class="pill" data-filter="security">PDF Security</button>
+        <button class="pill" data-filter="pdf">PDF Tools</button>
+        <button class="pill" data-filter="word">Word Tools</button>
+        <button class="pill" data-filter="image">Image Tools</button>
+        <button class="pill" data-filter="others">Others</button>
       </div>
     </div>
   </header>
@@ -463,13 +506,13 @@
       <div class="foot-cols">
         <div><h6>Product</h6><a href="#tools">All tools</a><a href="#tools">Workflows</a><a href="#tools">Releases</a></div>
         <div><h6>Resources</h6><a href="#">Help center</a><a href="#">Tutorials</a><a href="#">Blog</a><a href="#">API docs</a></div>
-        <div><h6>Solutions</h6><a href="#">For business</a><a href="#">For students</a><a href="#">Legal teams</a><a href="#">Education</a></div>
+        <div><h6>Solutions</h6><a href="#">For business</a><a href="#">For students</a><a href="#">Legal teams</a></div>
         <div><h6>Legal</h6><a href="#" data-show="privacy">Privacy</a><a href="#" data-show="terms">Terms</a><a href="#">Cookies</a><a href="#">Security</a></div>
-        <div><h6>Company</h6><a href="#">About</a><a href="#">Careers</a><a href="#">Contact</a><a href="#">Press</a></div>
+        <div><h6>Company</h6><a href="#">About</a><a href="#">Careers</a><a href="mailto:hopepdfofficial@gmail.com">Contact</a><a href="#">Press</a></div>
       </div>
     </div>
     <div class="foot-bottom">
-      <p>© <span id="footYear"></span> H<span class="brand-flower"><svg class="hope-flower-svg hope-flower-sm" aria-hidden="true"><use href="#hope-flower"/></svg></span>PE PDF · Crafted with care.</p>
+      <p>© <span id="footYear"></span> H<span class="brand-flower"><svg class="hope-flower-svg hope-flower-sm" aria-hidden="true"><use href="#hope-flower"/></svg></span>PE PDF · Crafted with care · <a href="mailto:hopepdfofficial@gmail.com">hopepdfofficial@gmail.com</a></p>
     </div>
   </footer>
 
@@ -642,8 +685,9 @@
   <!-- ─────────── TOAST CONTAINER ─────────── -->
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
-  <!-- Scripts -->
+  <!-- Scripts (load order matters) -->
   <script src="quotes.js"></script>
+  <script src="auth.js"></script>
   <script src="script.js"></script>
   <script src="tools.js"></script>
 </body>

@@ -1,0 +1,29 @@
+# Render blueprint — paste into Render dashboard or `render.yaml` at repo root.
+services:
+  - type: web
+    name: hope-pdf-server
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: FREE_MAX_FILE_MB
+        value: "20"
+      - key: PREMIUM_MAX_FILE_MB
+        value: "100"
+      - key: FREE_HOURLY_QUOTA
+        value: "5"
+      - key: PREMIUM_HOURLY_QUOTA
+        value: "200"

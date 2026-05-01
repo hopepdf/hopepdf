@@ -440,7 +440,17 @@
       toast('error', 'Invalid file type', `Please upload a valid ${label} file.`);
     }
     if (!accepted.length) return;
-    currentFiles = currentTool.multiple ? currentFiles.concat(accepted) : accepted.slice(0,1);
+
+    // Plan gate: Free plan = 1 file at a time even on multi-file tools.
+    // Premium = batch upload + parallel processing.
+    const isPremium = window.HopeAuth && window.HopeAuth.isPremium && window.HopeAuth.isPremium();
+    let next = currentTool.multiple ? currentFiles.concat(accepted) : accepted.slice(0, 1);
+    if (currentTool.multiple && !isPremium && next.length > 1) {
+      next = next.slice(0, 1);
+      toast('info', 'Free plan: 1 file at a time',
+        'Upgrade to Premium for batch upload + parallel processing.');
+    }
+    currentFiles = next;
     pushHistory();
     saveRecent(accepted);
     renderFileList();
@@ -605,6 +615,18 @@
 
   runBtn.addEventListener('click', async () => {
     if (!currentTool || !currentFiles.length) return;
+
+    // ── Auth + plan guard (Free 20 MB / Premium 100 MB; rate per hour+day)
+    if (window.HopeAuth) {
+      try {
+        for (const f of currentFiles) window.HopeAuth.checkFile(f);
+        window.HopeAuth.checkRate();
+      } catch (err) {
+        toast('error', 'Limit reached', err.message || 'Try a smaller file or upgrade.');
+        return;
+      }
+    }
+
     const opts = collectOptions();
     runBtn.classList.add('is-loading'); runBtn.disabled = true;
     // simulated per-file progress
@@ -689,9 +711,206 @@
     }
   }
 
-  /* Public API for tools.js */
+  /* ────────────────────────────────────────────────
+     Auth + plan UI (Google Sign-In + Razorpay upgrade)
+     Owns nothing the animation code touches; safe to live here.
+     ──────────────────────────────────────────────── */
+  (function setupAuthUi() {
+    if (!window.HopeAuth) return;
+    const planBadge   = $('#plan-badge');
+    const upgradeBtn  = $('#upgrade-btn');
+    const authSlot    = $('#auth-slot');
+    if (!planBadge || !upgradeBtn || !authSlot) return;
+
+    function syncBadgeAndSlot() {
+      const u = window.HopeAuth.getUser();
+      const p = window.HopeAuth.plan();
+      const label = window.HopeAuth.PLANS[p].label;
+      planBadge.textContent = p === 'free' ? 'Free' : label;
+      planBadge.dataset.plan = p;
+      if (u) {
+        authSlot.innerHTML = `
+          <span class="user-chip" title="${escapeHtml(u.email)}">${escapeHtml((u.name || u.email).split(' ')[0])}</span>
+          <button class="ghost-pill small" id="signout-btn" type="button">Sign out</button>`;
+        $('#signout-btn').addEventListener('click', () => {
+          window.HopeAuth.signOut();
+          // Also clear the GIS-set "user" key so auto-login on reload doesn't restore.
+          try { localStorage.removeItem('user'); } catch (_) {}
+          toast('info', 'Signed out', 'Come back any time.');
+        });
+      } else {
+        // Render the existing "Continue with Google" button (no UI change)
+        // and wire it to Google Identity Services using the real client ID.
+        authSlot.innerHTML = `
+          <button type="button" class="g-fallback-btn" id="g-login-btn">
+            <span class="g-mark" aria-hidden="true">G</span> Continue with Google
+          </button>`;
+        initGoogleSignIn();
+        $('#g-login-btn').addEventListener('click', () => {
+          if (window.google && window.google.accounts && window.google.accounts.id) {
+            window.google.accounts.id.prompt();
+          } else {
+            toast('error', 'Google not loaded', 'Check your connection and refresh.');
+          }
+        });
+      }
+    }
+
+    /* ── Google Identity Services (real Client ID) ───────────────── */
+    const GOOGLE_CLIENT_ID = "165450201442-6f6ls3vsn41r5qlk3v5089pro7h0l625.apps.googleusercontent.com";
+
+    function initGoogleSignIn() {
+      if (!window.google || !window.google.accounts || !window.google.accounts.id) return;
+      try {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleCredentialResponse,
+          auto_select: false
+        });
+      } catch (e) { /* GIS already initialized — safe to ignore */ }
+    }
+
+    // Decode JWT payload (no signature verification — that's GIS's job).
+    function parseJwt(token) {
+      const base64Url  = token.split('.')[1];
+      const base64     = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+      );
+      return JSON.parse(jsonPayload);
+    }
+
+    // Called by GIS once the user picks their Google account.
+    function handleCredentialResponse(response) {
+      try {
+        const profile = parseJwt(response.credential);
+        if (!profile || !profile.email) return;
+
+        // Per-spec: also store under "user" key for any code that reads it.
+        localStorage.setItem('user', JSON.stringify(profile));
+
+        // Keep the existing plan/Razorpay/limits flow intact by writing
+        // through HopeAuth so badge + quotas + expiry stay consistent.
+        const existing = window.HopeAuth.getUser() || {};
+        window.HopeAuth.saveUser({
+          email:     profile.email,
+          name:      profile.name || profile.email,
+          picture:   profile.picture || null,
+          plan:      existing.plan || 'free',
+          expiresAt: existing.expiresAt || null,
+          ts:        Date.now()
+        });
+
+        updateUIAfterLogin(profile);
+        toast('success', 'Signed in', `Welcome, ${(profile.name || profile.email).split(' ')[0]}!`);
+      } catch (e) {
+        console.error('Google login failed:', e);
+        toast('error', 'Login failed', 'Could not parse Google response.');
+      }
+    }
+
+    // Refresh the auth slot so the user-chip + sign-out button appear.
+    function updateUIAfterLogin(/*user*/) { syncBadgeAndSlot(); }
+
+    syncBadgeAndSlot();
+    window.HopeAuth.onChange(syncBadgeAndSlot);
+    // GIS may finish loading after first paint — re-render the button then.
+    setTimeout(syncBadgeAndSlot, 1500);
+
+    // Auto-login on reload (works whether the session is stored under
+    // "hope.user" by HopeAuth or "user" by handleCredentialResponse).
+    (function autoLoginOnReload() {
+      try {
+        const cached = JSON.parse(localStorage.getItem('user') || 'null');
+        if (cached && cached.email) updateUIAfterLogin(cached);
+      } catch (_) { /* ignore parse errors */ }
+    })();
+
+    upgradeBtn.addEventListener('click', openPricingModal);
+
+    function openPricingModal() {
+      const u = window.HopeAuth.getUser();
+      if (!u) { toast('info', 'Sign in first', 'Use Continue with Google to manage your plan.'); return; }
+      const PLANS = window.HopeAuth.PLANS;
+      const cur = window.HopeAuth.plan();
+
+      // Reuse the existing info-modal scaffold so styling stays consistent.
+      const infoModal = $('#info-modal');
+      const infoTitle = $('#info-title');
+      const infoBody  = $('#info-body');
+      infoTitle.textContent = 'Plans & Pricing';
+      infoBody.innerHTML = `
+        <div class="pricing-grid">
+          <article class="pricing-card ${cur === 'free' ? 'is-current' : ''}">
+            <h5>Free</h5>
+            <p class="price">₹0</p>
+            <ul>
+              <li>20 MB max file</li>
+              <li>${PLANS.free.dailyQuota} files / day</li>
+              <li>Ads enabled</li>
+            </ul>
+            <button class="btn btn-ghost full" data-pick="free" ${cur === 'free' ? 'disabled' : ''}>${cur === 'free' ? 'Current' : 'Switch to Free'}</button>
+          </article>
+          <article class="pricing-card highlight ${cur === 'premium-monthly' ? 'is-current' : ''}">
+            <h5>Premium Monthly</h5>
+            <p class="price">₹150<span>/mo</span></p>
+            <ul>
+              <li>100 MB max file</li>
+              <li>Unlimited usage</li>
+              <li>No ads</li>
+            </ul>
+            <button class="btn btn-primary full" data-pick="premium-monthly" ${cur === 'premium-monthly' ? 'disabled' : ''}>${cur === 'premium-monthly' ? 'Active' : 'Choose Monthly'}</button>
+          </article>
+          <article class="pricing-card ${cur === 'premium-yearly' ? 'is-current' : ''}">
+            <h5>Premium Yearly</h5>
+            <p class="price">₹1000<span>/yr</span></p>
+            <p class="save-pill">Save ₹800</p>
+            <ul>
+              <li>Everything in Monthly</li>
+              <li>Best value</li>
+              <li>Priority support</li>
+            </ul>
+            <button class="btn btn-primary full" data-pick="premium-yearly" ${cur === 'premium-yearly' ? 'disabled' : ''}>${cur === 'premium-yearly' ? 'Active' : 'Choose Yearly'}</button>
+          </article>
+        </div>
+        <p class="opt-hint">Secure payment via Razorpay. Files never leave your browser regardless of plan.</p>`;
+      infoModal.classList.add('is-open');
+      infoModal.setAttribute('aria-hidden', 'false');
+
+      $$('.pricing-card [data-pick]', infoBody).forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const pick = btn.dataset.pick;
+          try {
+            if (pick === 'free') {
+              window.HopeAuth.setPlan('free', null);
+              toast('success', 'Switched to Free', '');
+            } else {
+              btn.disabled = true; btn.textContent = 'Opening payment…';
+              await window.HopeAuth.startCheckout(pick);
+              toast('success', 'Welcome', `${PLANS[pick].label} activated.`);
+            }
+            infoModal.classList.remove('is-open');
+            infoModal.setAttribute('aria-hidden', 'true');
+          } catch (err) {
+            toast('error', 'Could not upgrade', err.message || 'Try again.');
+            btn.disabled = false;
+            btn.textContent = pick === 'premium-yearly' ? 'Choose Yearly' : 'Choose Monthly';
+          }
+        });
+      });
+    }
+  })();
+
+  /* Public API for tools.js
+     - Cards land on the homepage only when the tool declares a
+       homepageBucket ('pdf' | 'word' | 'image' | 'others').
+     - Tools without a bucket are still searchable + reachable
+       through the mega-menu, just not on the grid. */
   window.HopeWS = {
-    register(name, config) { tools[name] = config; if (config.cardCategory) ToolGrid.add(name, config); },
+    register(name, config) {
+      tools[name] = config;
+      if (config.homepageBucket) ToolGrid.add(name, config);
+    },
     open: openTool,
     close: closeTool,
     toast,
@@ -699,6 +918,10 @@
 
   /* ────────────────────────────────────────────────
      8. Tool grid + filter pills
+     Filter values ↔ homepage buckets:
+       all · pdf · word · image · others
+     Tools flagged comingSoon render as disabled cards
+     (no click-through, badge instead).
      ──────────────────────────────────────────────── */
   const grid = $('#tool-grid');
   const ToolGrid = (() => {
@@ -706,13 +929,15 @@
     function add(name, config) {
       cards.push({ name, ...config });
     }
-    function render(filter='all') {
+    function render(filter = 'all') {
       grid.innerHTML = '';
       cards.forEach((c, i) => {
-        if (filter !== 'all' && c.cardCategory !== filter) return;
+        // Hard rule (per spec): Coming Soon tools never appear on the homepage.
+        if (c.comingSoon) return;
+        if (filter !== 'all' && c.homepageBucket !== filter) return;
         const card = document.createElement('button');
         card.className = 'tool-card reveal';
-        card.dataset.cat = c.cardCategory;
+        card.dataset.cat = c.homepageBucket || c.cardCategory;
         card.style.setProperty('--i', i);
         card.innerHTML = `
           ${c.tag ? `<span class="tool-tag">${c.tag}</span>` : ''}

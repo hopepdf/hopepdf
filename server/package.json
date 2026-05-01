@@ -1,0 +1,29 @@
+{
+  "name": "hope-pdf-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend for H🌸PE PDF — auth, file processing, payments.",
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "dev":   "node --watch server.js"
+  },
+  "dependencies": {
+    "canvas": "^2.11.2",
+    "cors": "^2.8.5",
+    "docx": "^8.5.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "google-auth-library": "^9.13.0",
+    "helmet": "^7.1.0",
+    "mammoth": "^1.7.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "3.11.174",
+    "pdfkit": "^0.15.0",
+    "razorpay": "^2.9.4"
+  }
+}

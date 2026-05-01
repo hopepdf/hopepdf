@@ -66,11 +66,20 @@
     };
   }
 
+  /* ------------------------------------------------------------------
+   * Homepage bucket map
+   *   homepageBucket: 'pdf' | 'word' | 'image' | 'others' | undefined
+   *   comingSoon:     true  → render as disabled card (no click-through)
+   * Tools without homepageBucket stay searchable + reachable from the
+   * mega-menu but do not occupy a homepage slot.
+   * ------------------------------------------------------------------ */
+
   // ───────────────── 1. MERGE ─────────────────
   HopeWS.register('merge', {
     title: 'Merge PDF',
     subtitle: 'Combine PDFs in any order — drag to reorder.',
     cardCategory: 'organize',
+    homepageBucket: 'pdf',
     cardDesc: 'Combine multiple PDFs into a single document. Drag to reorder.',
     icon: '🗂️',
     tag: 'Popular',
@@ -101,6 +110,7 @@
     title: 'Split PDF',
     subtitle: 'Extract or break apart a PDF into smaller files.',
     cardCategory: 'organize',
+    homepageBucket: 'pdf',
     cardDesc: 'Extract page ranges or split a PDF into individual pages.',
     icon: '✂️',
     format: 'pdf',
@@ -152,6 +162,7 @@
   // ───────────────── 3. COMPRESS ─────────────────
   HopeWS.register('compress', {
     title: 'Compress PDF',
+    homepageBucket: 'pdf',
     subtitle: 'Reduce file size while keeping quality acceptable.',
     cardCategory: 'optimize',
     cardDesc: 'Reduce PDF file size for easy sharing.',
@@ -285,79 +296,224 @@
     },
   });
 
-  // ───────────────── 6. PDF → WORD (best-effort text extract) ─────────────────
+  // ───────────────── 6. PDF → WORD (page-as-image, layout-preserving) ─────────────────
+  // Strategy (frontend-only, layout-faithful):
+  //   1) pdf.js renders each page onto a canvas at 2× scale
+  //   2) canvas.toBlob → PNG bytes
+  //   3) docx ImageRun embeds each page as a full-bleed image inside
+  //      its own A4 section so spacing, alignment, columns, tables,
+  //      diagrams, and images all survive verbatim.
+  //
+  // Trade-off: the resulting .docx is *not* text-editable in Word. This
+  // is a deliberate choice — pure-browser DOCX with editable text *and*
+  // perfect layout is unsolved. If you need text editability, see the
+  // backend-route note at the bottom of this file.
   HopeWS.register('pdf2word', {
     title: 'PDF to Word',
-    subtitle: 'Extract text from PDF into a .docx file.',
+    subtitle: 'Each PDF page is embedded into Word as a high-fidelity image — layout preserved.',
     cardCategory: 'convert',
-    cardDesc: 'Convert text-based PDFs into editable Word documents.',
+    homepageBucket: 'pdf',
+    cardDesc: 'Convert PDFs into Word with full layout, images, tables, and spacing preserved.',
     icon: '📝',
     format: 'pdf',
-    multiple: false,
-    optionsHtml: `<p class="opt-hint">Best for text-based PDFs. Scanned/image PDFs may need OCR (coming soon).</p>`,
+    multiple: true,
+    minFiles: 1,
+    optionsHtml: `
+      <div class="opt-row">
+        <label>Image quality
+          <select name="quality">
+            <option value="1.5">Standard (smaller file)</option>
+            <option value="2" selected>High (recommended)</option>
+            <option value="3">Ultra (large file)</option>
+          </select>
+        </label>
+      </div>
+      <p class="opt-hint">Each page is captured as a high-resolution image and placed in Word at A4 size.
+        For text-editable output (with table/structure recovery), a backend converter is required —
+        see the comment block in <code>tools.js</code> for the recommended pipeline.</p>`,
     runLabel: 'Convert to Word',
     async run(files, opts, { downloadBlob, toast }) {
-      const file = files[0];
-      const buf = await file.arrayBuffer();
-      const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
-      const paragraphs = [];
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const tc = await page.getTextContent();
-        const text = tc.items.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
-        if (text) paragraphs.push(new window.docx.Paragraph({ children: [new window.docx.TextRun(text)] }));
-        paragraphs.push(new window.docx.Paragraph({ children: [new window.docx.TextRun('')] }));
+      const { Document, Packer, Paragraph, ImageRun } = window.docx;
+      const scale = Math.max(1.5, Math.min(3, parseFloat(opts.quality) || 2));
+
+      // A4 page size in EMU-equivalent pixels (docx uses px @ 96 dpi).
+      // ~ 8.27" × 11.69" minus 0.5" margins on each side ≈ 720 × 1040 px usable.
+      const PAGE_W = 720;
+
+      for (const file of files) {
+        let pdf;
+        try {
+          const buf = await file.arrayBuffer();
+          pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+        } catch (e) {
+          toast('error', 'Could not read PDF', `${file.name} appears corrupted or password-protected.`);
+          continue;
+        }
+
+        const children = [];
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+
+          // STEP 1: render this page to a canvas at the chosen scale
+          const viewport = page.getViewport({ scale });
+          const canvas   = document.createElement('canvas');
+          canvas.width   = Math.ceil(viewport.width);
+          canvas.height  = Math.ceil(viewport.height);
+          const ctx      = canvas.getContext('2d');
+          ctx.fillStyle  = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          await page.render({ canvasContext: ctx, viewport }).promise;
+
+          // STEP 2: snapshot canvas → PNG bytes
+          const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+          if (!blob) continue;
+          const pngBytes = new Uint8Array(await blob.arrayBuffer());
+
+          // STEP 3: embed at A4 page width, preserve aspect ratio
+          const targetW = PAGE_W;
+          const targetH = Math.round((viewport.height / viewport.width) * targetW);
+
+          children.push(new Paragraph({
+            spacing: { before: 0, after: 0 },
+            children: [new ImageRun({
+              data: pngBytes,
+              transformation: { width: targetW, height: targetH }
+            })]
+          }));
+        }
+
+        if (!children.length) {
+          toast('error', 'No pages rendered', `${file.name} produced no usable pages.`);
+          continue;
+        }
+
+        const doc = new Document({
+          sections: [{
+            properties: {
+              // Tight margins so each page-image sits flush — keeps the
+              // 1-page-PDF → 1-page-DOCX correspondence intact.
+              page: { margin: { top: 360, right: 360, bottom: 360, left: 360 } }
+            },
+            children
+          }]
+        });
+
+        const out = await Packer.toBlob(doc);
+        downloadBlob(out, safeName(file.name, '', 'docx'));
       }
-      if (!paragraphs.length) {
-        toast('error', 'No text found', 'This looks like an image-only PDF. Try OCR (coming soon).');
-        return;
-      }
-      const doc = new window.docx.Document({ sections: [{ properties: {}, children: paragraphs }] });
-      const blob = await window.docx.Packer.toBlob(doc);
-      downloadBlob(blob, safeName(file.name, '', 'docx'));
     },
   });
 
-  // ───────────────── 7. WORD → PDF (mammoth → jsPDF) ─────────────────
+  /* ─── Optional backend route (NOT enabled — for reference) ───────────
+   * If you can run a small server alongside this site, you can swap the
+   * frontend pipeline above for a real text-editable conversion:
+   *
+   *   pdf2docx (Python)
+   *     pip install pdf2docx
+   *     from pdf2docx import Converter
+   *     Converter(src).convert(dst); cv.close()
+   *   → preserves text, tables, headings, images.  Best free option.
+   *
+   *   LibreOffice headless
+   *     soffice --headless --convert-to docx file.pdf
+   *   → fast, ships with most Linux distros, tables decent.
+   *
+   * Either one would expose a POST /api/pdf2word endpoint that this
+   * tool's run() could call instead of the canvas pipeline. Until then,
+   * the in-browser image-per-page route is what's wired up.
+   * ───────────────────────────────────────────────────────────────── */
+
+  // ───────────────── 7. WORD → PDF (mammoth → jsPDF, multi-file) ─────────────────
   HopeWS.register('word2pdf', {
     title: 'Word to PDF',
-    subtitle: 'Turn .doc/.docx files into PDFs.',
+    subtitle: 'Turn one or several .doc/.docx files into PDFs.',
     cardCategory: 'convert',
+    homepageBucket: 'word',
     cardDesc: 'Convert Microsoft Word documents into clean PDFs.',
     icon: '📄',
     format: 'word',
-    multiple: false,
+    multiple: true,
+    minFiles: 1,
     runLabel: 'Convert to PDF',
     async run(files, opts, { downloadBlob, toast }) {
+      const { jsPDF } = window.jspdf;
+      let succeeded = 0;
+      for (const file of files) {
+        let raw;
+        try {
+          raw = await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+        } catch (e) {
+          toast('error', 'Could not parse', `${file.name} could not be read. Save as .docx (not legacy .doc) and retry.`);
+          continue;
+        }
+        const text = (raw.value || '').trim();
+        if (!text) { toast('error', 'Empty document', `${file.name} has no readable text.`); continue; }
+
+        const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+        const margin = 48;
+        const maxWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+        const lineHeight = 16;
+        let y = margin;
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(12);
+        for (const line of pdf.splitTextToSize(text, maxWidth)) {
+          if (y > pdf.internal.pageSize.getHeight() - margin) { pdf.addPage(); y = margin; }
+          pdf.text(line, margin, y);
+          y += lineHeight;
+        }
+        downloadBlob(pdf.output('blob'), safeName(file.name, '', 'pdf'));
+        succeeded++;
+      }
+      if (!succeeded) throw new Error('No files were converted.');
+    },
+  });
+
+  // ───────────────── 7b. WORD ORGANIZE (basic paragraph reorder) ─────────────────
+  // Reads a .docx with mammoth, splits into paragraphs by blank lines, lets the
+  // user supply a comma-separated 1-based order (e.g. "3,1,2,4") and writes a
+  // fresh .docx with paragraphs in that order. Heavy formatting is intentionally
+  // dropped so the output is predictable.
+  HopeWS.register('word-organize', {
+    title: 'Word Organize',
+    subtitle: 'Reorder paragraphs in a .docx file.',
+    cardCategory: 'organize',
+    homepageBucket: 'word',
+    cardDesc: 'Reorganize the paragraphs in a Word document.',
+    icon: '🧾',
+    format: 'word',
+    multiple: false,
+    optionsHtml: `
+      <div class="opt-row">
+        <label>Order
+          <input type="text" name="order" placeholder="e.g. 3, 1, 2, 4 — leave empty to keep current order">
+        </label>
+      </div>
+      <p class="opt-hint">Tip: paragraphs are split on blank lines. Save your doc as .docx for best results.</p>`,
+    runLabel: 'Reorder Word',
+    async run(files, opts, { downloadBlob }) {
+      const { Document, Packer, Paragraph, TextRun } = window.docx;
       const file = files[0];
       const buf = await file.arrayBuffer();
-      let raw;
-      try {
-        raw = await window.mammoth.extractRawText({ arrayBuffer: buf });
-      } catch (e) {
-        toast('error', 'Could not parse', 'This .doc/.docx file could not be read.');
-        return;
+      const { value: raw } = await window.mammoth.extractRawText({ arrayBuffer: buf });
+      const paragraphs = (raw || '').split(/\r?\n\s*\r?\n+/).map(s => s.trim()).filter(Boolean);
+      if (!paragraphs.length) throw new Error('No paragraphs found in this document.');
+
+      let order;
+      const orderStr = (opts.order || '').trim();
+      if (orderStr) {
+        order = orderStr.split(/[,\s]+/).map(n => parseInt(n, 10) - 1)
+          .filter(i => Number.isFinite(i) && i >= 0 && i < paragraphs.length);
+        if (!order.length) throw new Error(`Use numbers 1–${paragraphs.length}.`);
+      } else {
+        order = paragraphs.map((_, i) => i);
       }
-      const text = (raw.value || '').trim();
-      if (!text) {
-        toast('error', 'Empty document', 'No readable text found.');
-        return;
-      }
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
-      const margin = 48;
-      const maxWidth = pdf.internal.pageSize.getWidth() - margin * 2;
-      const lineHeight = 16;
-      let y = margin;
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(12);
-      const lines = pdf.splitTextToSize(text, maxWidth);
-      lines.forEach(line => {
-        if (y > pdf.internal.pageSize.getHeight() - margin) { pdf.addPage(); y = margin; }
-        pdf.text(line, margin, y);
-        y += lineHeight;
+
+      const doc = new Document({
+        sections: [{ children: order.map(i => new Paragraph({ children: [new TextRun(paragraphs[i])] })) }]
       });
-      downloadBlob(pdf.output('blob'), safeName(file.name, '', 'pdf'));
+      const blob = await Packer.toBlob(doc);
+      downloadBlob(blob, safeName(file.name, 'organized', 'docx'));
     },
   });
 
@@ -366,6 +522,7 @@
     title: 'JPG to PDF',
     subtitle: 'Combine JPG/PNG images into a PDF — drag to reorder.',
     cardCategory: 'convert',
+    homepageBucket: 'image',
     cardDesc: 'Combine JPG/PNG images into a single PDF, in any order.',
     icon: '🖼️',
     format: 'image',
@@ -445,11 +602,58 @@
     },
   });
 
+  // ───────────────── 8b. IMAGE COMPRESS (JPG/PNG → JPG, batch) ─────────────────
+  // Re-encodes JPG/PNG inputs as JPG at the chosen quality. Lossless PNG inputs
+  // become lossy JPG outputs — there's no real "compress PNG" in pure browser JS
+  // without per-codec libs, and JPG re-encode is what users actually want for
+  // storage savings.
+  HopeWS.register('image-compress', {
+    title: 'Image Compress',
+    subtitle: 'Shrink JPG/PNG by re-encoding at your chosen quality.',
+    cardCategory: 'optimize',
+    homepageBucket: 'image',
+    cardDesc: 'Reduce JPG/PNG file size with a quality slider.',
+    icon: '🪶',
+    format: 'image',
+    multiple: true,
+    minFiles: 1,
+    optionsHtml: `
+      <div class="opt-row">
+        <label>Quality
+          <input type="range" name="quality" min="0.3" max="0.95" step="0.05" value="0.7">
+          <span class="opt-out" data-out="quality">70%</span>
+        </label>
+      </div>`,
+    runLabel: 'Compress',
+    async run(files, opts, { downloadBlob }) {
+      const q = Math.max(0.3, Math.min(0.95, parseFloat(opts.quality) || 0.7));
+      for (const f of files) {
+        const url = URL.createObjectURL(f);
+        try {
+          const img = await new Promise((res, rej) => {
+            const im = new Image();
+            im.onload = () => res(im);
+            im.onerror = () => rej(new Error(`Could not read ${f.name}.`));
+            im.src = url;
+          });
+          const c = document.createElement('canvas');
+          c.width = img.naturalWidth; c.height = img.naturalHeight;
+          c.getContext('2d').drawImage(img, 0, 0);
+          const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
+          downloadBlob(blob, safeName(f.name, 'compressed', 'jpg'));
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+    },
+  });
+
   // ───────────────── 9. PDF → JPG ─────────────────
   HopeWS.register('pdf2jpg', {
     title: 'PDF to JPG',
     subtitle: 'Save each page of your PDF as a JPG image.',
     cardCategory: 'convert',
+    homepageBucket: 'pdf',
     cardDesc: 'Render every page of a PDF to high-quality JPG images.',
     icon: '🌅',
     format: 'pdf',
@@ -595,16 +799,41 @@
   // ───────────────── 13. ORGANIZE / REORDER ─────────────────
   HopeWS.register('organize', {
     title: 'Organize PDF',
-    subtitle: 'Reorder, rotate or delete pages — interactive.',
+    subtitle: 'Reorder pages — provide a comma-separated 1-based page order.',
     cardCategory: 'organize',
-    cardDesc: 'Reorder, rotate, or delete pages with thumbnails.',
+    homepageBucket: 'others',
+    cardDesc: 'Reorder or remove pages by listing the order you want.',
     icon: '🧩',
     tag: 'New',
     format: 'pdf',
     multiple: false,
-    optionsHtml: `<p class="opt-hint">Drag pages in the file list area to reorder. Use the on-screen controls to delete or rotate.</p>`,
-    runLabel: 'Save',
-    run: stub('Organize'),
+    optionsHtml: `
+      <div class="opt-row">
+        <label>Page order
+          <input type="text" name="order" placeholder="e.g. 3,1,2,4 — leave empty to keep current order">
+        </label>
+      </div>
+      <p class="opt-hint">Pages not listed are dropped. Same number twice = duplicate.</p>`,
+    runLabel: 'Save reordered PDF',
+    async run(files, opts, { downloadBlob }) {
+      const file = files[0];
+      const src = await loadPdf(file);
+      const total = src.getPageCount();
+      const orderStr = (opts.order || '').trim();
+      let order;
+      if (orderStr) {
+        order = orderStr.split(/[,\s]+/).map(n => parseInt(n, 10) - 1)
+          .filter(i => Number.isFinite(i) && i >= 0 && i < total);
+        if (!order.length) throw new Error(`Use page numbers between 1 and ${total}.`);
+      } else {
+        order = src.getPageIndices();
+      }
+      const out = await PDFDocument.create();
+      const pages = await out.copyPages(src, order);
+      pages.forEach(p => out.addPage(p));
+      const bytes = await out.save();
+      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), safeName(file.name, 'organized'));
+    },
   });
 
   // ───────────────── 14. CROP PDF ─────────────────
@@ -730,22 +959,71 @@
     run: stub('PDF to Excel'),
   });
 
+  // ───────────────── HTML → PDF (real impl) ─────────────────
+  // Reads the uploaded HTML inside a sandboxed iframe (so any embedded
+  // <script> can't run against our window) and uses jsPDF.html() with
+  // html2canvas to rasterize. Falls back to plain-text typesetting if
+  // html2canvas isn't available.
   HopeWS.register('html2pdf', {
     title: 'HTML to PDF',
-    subtitle: 'Save a saved HTML page as PDF.',
+    subtitle: 'Convert a saved HTML page into a clean PDF.',
     cardCategory: 'convert',
+    homepageBucket: 'others',
     cardDesc: 'Convert a saved HTML page into a clean PDF.',
     icon: '🌐',
     format: 'html',
     multiple: false,
-    runLabel: 'Convert',
-    run: stub('HTML to PDF'),
+    runLabel: 'Convert to PDF',
+    async run(files, opts, { downloadBlob }) {
+      const file = files[0];
+      const html = await file.text();
+
+      // sandboxed iframe so any inline <script> is neutralised
+      const frame = document.createElement('iframe');
+      frame.setAttribute('sandbox', 'allow-same-origin');
+      frame.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;height:auto;background:#fff;';
+      document.body.appendChild(frame);
+      frame.contentDocument.open();
+      frame.contentDocument.write(`<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Inter,Arial,sans-serif;padding:24px;color:#111;background:#fff;}img{max-width:100%}</style></head><body>${html}</body></html>`);
+      frame.contentDocument.close();
+      await new Promise(r => setTimeout(r, 80));
+
+      const { jsPDF } = window.jspdf;
+      try {
+        if (window.html2canvas) {
+          const canvas = await window.html2canvas(frame.contentDocument.body, { scale: 2, backgroundColor: '#ffffff' });
+          const img = canvas.toDataURL('image/jpeg', 0.92);
+          const pdf = new jsPDF({ unit: 'px', format: [canvas.width, canvas.height] });
+          pdf.addImage(img, 'JPEG', 0, 0, canvas.width, canvas.height);
+          downloadBlob(pdf.output('blob'), safeName(file.name, '', 'pdf'));
+        } else {
+          // Fallback: dump visible text into A4
+          const text = (frame.contentDocument.body.innerText || '').trim() || 'Empty document';
+          const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+          const margin = 48;
+          const maxWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+          let y = margin;
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(12);
+          for (const line of pdf.splitTextToSize(text, maxWidth)) {
+            if (y > pdf.internal.pageSize.getHeight() - margin) { pdf.addPage(); y = margin; }
+            pdf.text(line, margin, y);
+            y += 16;
+          }
+          downloadBlob(pdf.output('blob'), safeName(file.name, '', 'pdf'));
+        }
+      } finally {
+        frame.remove();
+      }
+    },
   });
 
+  // PDF/A — kept registered so the mega-menu link still works, but
+  // hidden from the homepage per spec ("Coming Soon" must NOT appear there).
   HopeWS.register('pdf2pdfa', {
     title: 'PDF to PDF/A',
     subtitle: 'Convert to long-term archival format.',
     cardCategory: 'optimize',
+    comingSoon: true, // no homepageBucket → not on grid
     cardDesc: 'Make PDFs archive-ready (PDF/A standard).',
     icon: '🏛️',
     format: 'pdf',

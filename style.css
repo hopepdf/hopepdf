@@ -418,10 +418,20 @@ body[data-theme="light"] .nav {
   -webkit-background-clip: text; background-clip: text; color: transparent;
   letter-spacing: .3px;
 }
+/* Flower replaces the visual "O" in HOPE — must hug the letters tightly
+   on both sides so the wordmark reads as HOPE PDF (not HO PE PDF). */
 .brand-flower {
-  display: inline-flex; align-items: center; justify-content: center;
+  display: inline-block;     /* inline-flex was leaking baseline whitespace */
   vertical-align: middle;
-  line-height: 1;
+  line-height: 0;            /* collapse internal box leading */
+  margin: 0 -0.04em;         /* pull H + PE in slightly to close the gap */
+  padding: 0;
+  font-size: 0;              /* removes whitespace nodes around the SVG */
+  letter-spacing: 0;
+}
+.brand-flower .hope-flower-svg {
+  font-size: 1rem;           /* restore SVG sizing context */
+  vertical-align: middle;
 }
 /* Custom HOPE flower SVG — 5 petals + warm halo, replaces 🌸 emoji */
 .hope-flower-svg {
@@ -1941,3 +1951,118 @@ body[data-theme="light"] .chat-bubble {
   color: #1a0f14;
 }
 
+
+/* ================================================================
+   Auth + Plan + Pricing modal styles  (added by spec)
+   ================================================================ */
+
+/* Plan badge in nav-actions */
+.plan-badge {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .18);
+  color: var(--ink-mute, #aab2c7);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.plan-badge[data-plan="premium-monthly"],
+.plan-badge[data-plan="premium-yearly"] {
+  background: linear-gradient(90deg, #ffc76d, #ff9059);
+  color: #1a1207;
+  border-color: transparent;
+}
+
+/* Upgrade ghost-pill button */
+.ghost-pill {
+  border-radius: 999px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px; font-weight: 600;
+  transition: background .2s ease, border-color .2s ease;
+}
+.ghost-pill:hover { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .35); }
+.ghost-pill.small { padding: 4px 10px; font-size: 11px; }
+body[data-theme="light"] .ghost-pill { border-color: rgba(0, 0, 0, .14); }
+body[data-theme="light"] .ghost-pill:hover { background: rgba(0, 0, 0, .04); }
+
+/* Auth slot */
+.auth-slot { display: flex; align-items: center; gap: 6px; min-height: 32px; }
+.user-chip {
+  font-size: 12px; padding: 5px 10px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .06);
+  color: inherit; max-width: 110px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.g-signin { display: inline-flex; }
+.g-fallback-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 999px; padding: 6px 12px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .2);
+  background: #1a1c25; color: #fff;
+  font-weight: 600; font-size: 12px;
+}
+.g-fallback-btn .g-mark {
+  display: inline-grid; place-items: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; color: #4285F4; font-weight: 800; font-size: 11px;
+}
+@media (max-width: 700px) {
+  .plan-badge { display: none; } /* keep header tight on phones */
+}
+
+/* Disabled "Coming Soon" tool card */
+.tool-card.is-disabled {
+  opacity: .55;
+  filter: grayscale(.4);
+  cursor: not-allowed;
+}
+.tool-card.is-disabled:hover { transform: none; box-shadow: none; }
+.tool-tag.soon-tag {
+  background: rgba(255, 107, 107, .16);
+  color: #ff9090;
+  border-color: rgba(255, 107, 107, .35);
+}
+
+/* Pricing modal grid */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px; margin: 8px 0 12px;
+}
+.pricing-card {
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 14px;
+  padding: 16px;
+  background: rgba(255, 255, 255, .04);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.pricing-card.highlight {
+  background: linear-gradient(180deg, rgba(255, 199, 109, .14), rgba(255, 144, 89, .08));
+  border-color: rgba(255, 175, 109, .55);
+}
+.pricing-card.is-current {
+  outline: 2px solid #59f0a8;
+  outline-offset: -2px;
+}
+.pricing-card h5 { margin: 0; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-mute, #aab2c7); }
+.pricing-card .price { margin: 0; font-size: 28px; font-weight: 800; }
+.pricing-card .price span { font-size: 13px; color: var(--ink-mute, #aab2c7); font-weight: 500; }
+.pricing-card ul { margin: 4px 0 0; padding-left: 18px; color: var(--ink-mute, #aab2c7); font-size: 13px; line-height: 1.5; }
+.pricing-card .save-pill {
+  align-self: flex-start; margin: 0;
+  background: rgba(89, 240, 168, .18); color: #59f0a8;
+  font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+}
+.pricing-card .full { width: 100%; margin-top: auto; }
+.pricing-card button[disabled] { opacity: .65; cursor: default; }
+@media (max-width: 720px) {
+  .pricing-grid { grid-template-columns: 1fr; }
+}
+body[data-theme="light"] .pricing-card { background: rgba(0, 0, 0, .03); border-color: rgba(0, 0, 0, .1); }
+body[data-theme="light"] .plan-badge   { background: rgba(0, 0, 0, .05); border-color: rgba(0, 0, 0, .1); color: #5f687b; }
+body[data-theme="light"] .user-chip    { background: rgba(0, 0, 0, .04); border-color: rgba(0, 0, 0, .12); color: #1f2433; }
