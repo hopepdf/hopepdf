@@ -39,9 +39,11 @@
 <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
-<!-- Auth (payments disabled during soft-launch — uncomment Razorpay
-     to re-enable billing). -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- Auth: server-side OAuth redirect flow only. The Google Identity
+     Services popup script is intentionally NOT loaded — login goes
+     through the backend at /auth/google. Razorpay is also disabled
+     during soft-launch (uncomment to re-enable). -->
+<!-- <script src="https://accounts.google.com/gsi/client" async defer></script> -->
 <!-- <script src="https://checkout.razorpay.com/v1/checkout.js" defer></script> -->
 
 <!-- JSON-LD for SEO -->

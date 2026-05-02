@@ -18,6 +18,8 @@ const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 const { PDFDocument } = require('pdf-lib');
 const pdfParse = require('pdf-parse');
 const libreoffice = require('./libreoffice.service');
+const ocr = require('./ocr.service');
+const docxLib = require('docx');
 
 // pdfjs needs a few DOM globals on Node.
 if (!global.DOMMatrix) global.DOMMatrix = Canvas.DOMMatrix;
@@ -110,48 +112,81 @@ async function toJpg(filePath, opts = {}) {
   return out;
 }
 
-/* PDF → DOCX (real conversion engine).
+/* PDF → DOCX with engine cascade.
  *
- * Strategy:
- *   1) Detect a text layer with pdf-parse.
- *      • Scanned PDFs (no text) → throw a clear "needs OCR" error.
- *        OCR fallback path (Tesseract) is documented at the bottom of this file.
- *   2) Shell out to LibreOffice. Result: selectable text, embedded
- *      images, tables and layout preserved — not a flat raster.
+ *   text-layer present  →  pdf2docx (PRIMARY) → LibreOffice (FALLBACK)
+ *   text-layer missing  →  Tesseract OCR (renders pages, extracts text,
+ *                          assembles a real DOCX with selectable text)
  *
- * Returns the absolute path to the generated .docx so the controller
- * can stream it from disk and clean up after.
+ * Either path returns the absolute path of a real text-DOCX. We never
+ * embed full-page rasters in the toWord output.
  */
 async function toWord(filePath) {
-  // 1) Bail out early on scanned PDFs.
+  // 1) Probe for a text layer.
   const buf = await fs.promises.readFile(filePath);
   let textLen = 0;
   try { const r = await pdfParse(buf); textLen = (r.text || '').trim().length; } catch (_) { textLen = 0; }
-  if (textLen < 30) {
-    const err = new Error('This PDF appears to be scanned (no text layer). Run it through OCR first.');
+
+  const outDir = path.join(path.dirname(filePath), `out-${Date.now()}`);
+
+  // 2a) Has text → real engine
+  if (textLen >= 30) {
+    return await libreoffice.convertPdfToDocx(filePath, outDir);
+  }
+
+  // 2b) No text → OCR (scanned PDF)
+  if (!(await ocr.isAvailable())) {
+    const err = new Error('This PDF is scanned and OCR (tesseract) is not installed on the server.');
     err.code = 'NO_TEXT_LAYER';
     throw err;
   }
+  return await ocrPdfToDocx(filePath, outDir);
+}
 
-  // 2) Real conversion. convertPdfToDocx auto-selects:
-  //      pdf2docx (PRIMARY) → LibreOffice (FALLBACK) → throw NO_CONVERTER
-  //    Internally serialised to one job at a time across the process.
-  const outDir = path.join(path.dirname(filePath), `out-${Date.now()}`);
-  return await libreoffice.convertPdfToDocx(filePath, outDir);
+/* Renders every page → PNG → tesseract → assembles a docx with the
+ * recovered text. Output is real selectable text, NOT a page image.
+ */
+async function ocrPdfToDocx(filePath, outDir) {
+  console.log('[pdf→docx] Using engine: OCR (Tesseract) — scanned PDF detected');
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docxLib;
+
+  const buf = await readBuf(filePath);
+  const pdf = await loadPdfJs(buf);
+  const children = [];
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const { png } = await renderPageToPng(page, 2);
+    let text = '';
+    try { text = await ocr.imageBufferToText(png, 'eng'); }
+    catch (e) { console.warn(`[pdf→docx] OCR page ${i} failed: ${e.message}`); }
+
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_4,
+      children: [new TextRun({ text: `Page ${i}`, bold: true })]
+    }));
+
+    if (text) {
+      // Treat blank lines as paragraph breaks — gives readable structure.
+      text.split(/\r?\n\s*\r?\n+/).forEach((block) => {
+        const t = block.replace(/\s+\n/g, '\n').trim();
+        if (t) children.push(new Paragraph({ children: [new TextRun(t)] }));
+      });
+    } else {
+      children.push(new Paragraph({ children: [new TextRun({ text: '(no text recognised on this page)', italics: true })] }));
+    }
+  }
+
+  fs.mkdirSync(outDir, { recursive: true });
+  const docxBuf = await Packer.toBuffer(new Document({ sections: [{ children }] }));
+  const base    = path.basename(filePath).replace(/\.[a-z0-9]+$/i, '');
+  const outPath = path.join(outDir, `${base}.docx`);
+  fs.writeFileSync(outPath, docxBuf);
+  console.log(`[pdf→docx] OCR done — ${(docxBuf.length / 1024).toFixed(1)} KB`);
+  return outPath;
 }
 
 module.exports = { merge, split, compress, toJpg, toWord };
 
-/* ─── OCR fallback (optional, not enabled) ─────────────────────────
- * If you want scanned PDFs to convert too, render each page to a PNG
- * here (using the existing renderPageToPng helper) and feed each PNG
- * into Tesseract.js:
- *
- *   const Tesseract = require('tesseract.js');
- *   const { data: { text } } = await Tesseract.recognize(pngBuffer, 'eng');
- *
- * Then assemble the recovered text into a DOCX with the `docx`
- * package. The cost is build size (~30 MB language model) and
- * runtime (a few seconds per page), so it's left off the default
- * path. Wire it behind an `ocr=true` query flag if you need it.
- * ──────────────────────────────────────────────────────────────── */
+/* OCR is now wired into toWord above (system tesseract via
+ * services/ocr.service.js). No additional setup needed. */

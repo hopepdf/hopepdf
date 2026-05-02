@@ -725,7 +725,7 @@
     /* Single source of truth for the auth slot.
      *   Signed in  → Google-style profile button + dropdown card with
      *                avatar / name / email / plan-tinted card / actions
-     *   Signed out → empty #googleSignInContainer; HopeAuth.initGoogle
+     *   Signed out → custom gold "Sign in" button → backend redirect
      *                renders the one-and-only Google button into it.
      *
      * Plan-based card styling:

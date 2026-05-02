@@ -1,60 +1,50 @@
-/* Google authentication — TWO modes coexist:
+/* Google authentication — server-side OAuth 2.0 redirect flow ONLY.
  *
- *   (a) ID-token verification  — used by /auth/google (POST) and the
- *       Authorization: Bearer <id_token> middleware. No client_secret
- *       needed; verifies against Google's published JWKs.
+ *   GET  /auth/google           → passport.authenticate('google')
+ *   GET  /auth/google/callback  → passport callback → JWT → frontend
  *
- *   (b) OAuth 2.0 redirect flow — passport-google-oauth20 strategy.
- *       Used by GET /auth/google + GET /auth/google/callback.
- *       Requires GOOGLE_CLIENT_SECRET in env.
+ *   All three values come from env vars — nothing is hardcoded:
+ *     GOOGLE_CLIENT_ID
+ *     GOOGLE_CLIENT_SECRET
+ *     GOOGLE_CALLBACK_URL
  *
- *   The module's default export is the configured passport instance so
- *   routes can do `const passport = require('./services/google.service')`.
- *   verifyIdToken is attached to passport so the existing middleware
- *   keeps working without changes.
+ *   verifyIdToken is kept attached to the passport export ONLY so that
+ *   existing middleware (auth.middleware.js) using
+ *   `Authorization: Bearer <id_token>` headers doesn't break for
+ *   protected routes. The frontend no longer issues GIS id tokens.
  */
 const { OAuth2Client } = require('google-auth-library');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const env = require('../config/env');
 const userService = require('./user.service');
 
 const ADMIN_EMAIL = 'hopepdfofficial@gmail.com';
 
-/* (a) ID-token verifier — kept exactly as before so middleware/auth keeps working. */
-const oauthClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
-async function verifyIdToken(idToken) {
-  if (!idToken) throw new Error('Missing Google ID token');
-  if (!env.GOOGLE_CLIENT_ID) throw new Error('GOOGLE_CLIENT_ID is not configured on the server');
-  const ticket = await oauthClient.verifyIdToken({ idToken, audience: env.GOOGLE_CLIENT_ID });
-  const p = ticket.getPayload();
-  if (!p || !p.email_verified) throw new Error('Email not verified by Google');
-  return { email: p.email, name: p.name, picture: p.picture, sub: p.sub };
-}
+// ── env-only config (no hardcoded fallback) ──────────────────────────
+const GOOGLE_CLIENT_ID     = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_CALLBACK_URL  = process.env.GOOGLE_CALLBACK_URL;
 
-/* (b) Passport strategy — registered only when secrets are present so
- *      a missing GOOGLE_CLIENT_SECRET in dev doesn't crash the server. */
-if (env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  // Use the absolute URL when set (recommended on production behind a
-  // proxy like Render — relative URLs can resolve to http://… and
-  // trigger Google's redirect_uri_mismatch / invalid_client errors).
-  const callbackURL = process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback';
+console.log('[auth] Using Google Client ID:', GOOGLE_CLIENT_ID || '(missing!)');
+console.log('[auth] Callback URL          :', GOOGLE_CALLBACK_URL || '(missing!)');
+
+// ── Passport Google strategy (single login flow) ────────────────────
+if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_CALLBACK_URL) {
   passport.use(new GoogleStrategy(
     {
-      clientID:     env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL,
+      clientID:     GOOGLE_CLIENT_ID,
+      clientSecret: GOOGLE_CLIENT_SECRET,
+      callbackURL:  GOOGLE_CALLBACK_URL,
       proxy:        true
     },
-    (accessToken, refreshToken, profile, done) => {
+    (_accessToken, _refreshToken, profile, done) => {
       try {
         const email   = profile.emails && profile.emails[0] && profile.emails[0].value;
         const picture = profile.photos && profile.photos[0] && profile.photos[0].value;
         if (!email) return done(new Error('Google account has no email'));
         const isAdmin = email === ADMIN_EMAIL;
 
-        // Persist into our local store so plan/expiry stays in sync with
-        // the existing user system (Razorpay, file limits, etc.).
+        // Persist locally so plan/role stay aligned with the rest of the app.
         let stored;
         try { stored = userService.upsert({ email, name: profile.displayName, picture }); }
         catch (_) { stored = { plan: 'free', expiresAt: null }; }
@@ -71,10 +61,21 @@ if (env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       } catch (err) { return done(err); }
     }
   ));
+} else {
+  console.error('[auth] ⚠️  Google strategy NOT registered — set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_CALLBACK_URL.');
 }
 
-// Attach the ID-token verifier so existing callers (auth.middleware.js,
-// auth.controller.js) keep working unchanged.
+// ── Legacy ID-token verifier (kept for protected-route middleware) ──
+const oauthClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
+async function verifyIdToken(idToken) {
+  if (!idToken) throw new Error('Missing Google ID token');
+  if (!oauthClient) throw new Error('GOOGLE_CLIENT_ID is not configured on the server');
+  const ticket = await oauthClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+  const p = ticket.getPayload();
+  if (!p || !p.email_verified) throw new Error('Email not verified by Google');
+  return { email: p.email, name: p.name, picture: p.picture, sub: p.sub };
+}
+
 passport.verifyIdToken = verifyIdToken;
 passport.ADMIN_EMAIL   = ADMIN_EMAIL;
 

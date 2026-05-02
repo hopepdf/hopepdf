@@ -86,60 +86,11 @@ window.HopeAuth = (() => {
     localStorage.setItem('hope.usage', JSON.stringify(usage));
   }
 
-  // ---------- Google Sign-In (GIS only, popup mode) ------------------
-  // Strict rules:
-  //   • google.accounts.id.initialize() runs at most once per page load
-  //     (idempotent flag below).
-  //   • renderButton() may be called many times — fine.
-  //   • handleCredential POSTs the idToken to the backend, stores the
-  //     verified user under "hope.user" and reloads.
-
-  let gisInitialized = false;
-
-  async function handleCredential(resp) {
-    try {
-      const r = await fetch(`${BACKEND_URL}/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: resp.credential })
-      });
-      const data = await r.json();
-      if (data.ok && data.user) {
-        localStorage.setItem('hope.user', JSON.stringify(data.user));
-        location.reload();
-      } else {
-        console.error('Login failed', data);
-      }
-    } catch (err) {
-      console.error('Login failed', err);
-    }
-  }
-
-  function initGoogle(buttonContainer) {
-    if (!buttonContainer) return;
-    if (!window.google || !google.accounts || !google.accounts.id) return;
-    try {
-      if (!gisInitialized) {
-        google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleCredential
-        });
-        gisInitialized = true;
-      }
-      buttonContainer.innerHTML = '';
-      google.accounts.id.renderButton(buttonContainer, {
-        theme: 'outline',
-        size:  'large',
-        width: 220
-      });
-    } catch (e) {
-      console.error('GIS init/render failed', e);
-    }
-  }
+  // ---------- Sign-out (only auth helper kept; GIS popup removed) ----
+  // Login is now the server-side redirect flow only:
+  //   gold button → window.location → BACKEND_URL/auth/google
+  // Backend handles Google + JWT, frontend reads ?token=… on return.
   function signOut() {
-    if (window.google && google.accounts && google.accounts.id) {
-      try { google.accounts.id.disableAutoSelect(); } catch (_) {}
-    }
     saveUser(null);
   }
   function setPlan(p, expiresAt) {
@@ -215,7 +166,7 @@ window.HopeAuth = (() => {
     PLANS,
     getUser, plan, isPremium, planLimits,
     checkFile, checkRate,
-    initGoogle, signOut, setPlan,
+    signOut, setPlan,
     startCheckout, onChange
   };
 })();

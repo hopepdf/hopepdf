@@ -60,11 +60,20 @@ function isPythonFallbackAvailable() {
  * Never throws — just logs.
  */
 async function verifyConverters() {
-  const [soffice, py] = await Promise.all([isAvailable(), isPythonFallbackAvailable()]);
+  const ocr = require('./ocr.service');
+  const [soffice, py, tess] = await Promise.all([
+    isAvailable(),
+    isPythonFallbackAvailable(),
+    ocr.isAvailable()
+  ]);
   console.log('[converters] LibreOffice (soffice):', soffice ? '✓ available' : '✗ missing');
-  console.log('[converters] pdf2docx (python3):',  py      ? '✓ available' : '✗ missing');
+  console.log('[converters] pdf2docx (python3):',    py      ? '✓ available' : '✗ missing');
+  console.log('[converters] OCR (tesseract):',       tess    ? '✓ available' : '✗ missing');
   if (!soffice && !py) {
-    console.error('[converters] ⚠️  No PDF→DOCX engine available — /pdf/to-word will return 503 NO_CONVERTER on every request.');
+    console.error('[converters] ⚠️  No PDF→DOCX text engine available — text-based PDFs will fail.');
+  }
+  if (!tess) {
+    console.warn('[converters] ⚠️  Tesseract missing — scanned PDFs will return NO_TEXT_LAYER.');
   }
 }
 
