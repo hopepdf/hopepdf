@@ -755,12 +755,20 @@
       planBadge.dataset.plan = p;
 
       // Upgrade button — visible only for free users (premium hides it).
+      // Use both `hidden` attribute and inline style so cached CSS or
+      // late renders can't bring the pill back.
       const isPrem = p !== 'free';
-      upgradeBtn.dataset.plan  = p;
-      upgradeBtn.textContent   = 'Upgrade';
-      upgradeBtn.disabled      = false;
-      upgradeBtn.style.display = isPrem ? 'none' : '';
+      upgradeBtn.dataset.plan = p;
+      upgradeBtn.textContent  = 'Upgrade';
+      upgradeBtn.disabled     = false;
       upgradeBtn.classList.remove('is-gold');
+      if (isPrem) {
+        upgradeBtn.setAttribute('hidden', '');
+        upgradeBtn.style.display = 'none';
+      } else {
+        upgradeBtn.removeAttribute('hidden');
+        upgradeBtn.style.display = '';
+      }
 
       if (u) {
         const initial = (u.name || u.email || '?').trim().charAt(0).toUpperCase();

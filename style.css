@@ -2094,6 +2094,7 @@ body[data-theme="light"] .user-chip    { background: rgba(0, 0, 0, .04); border-
   font-weight: 800;
   font-size: 20px;
   letter-spacing: .3px;
+  white-space: nowrap;
   background: linear-gradient(90deg, #ffd9b5, #e6b352);
   -webkit-background-clip: text;
           background-clip: text;
@@ -2341,3 +2342,6 @@ body[data-theme="light"] .brand.logo .brand-mark {
 @media (max-width: 880px) {
   .nav-actions .nav-search { display: none; }
 }
+
+/* Hard hide for the Upgrade button when premium — defeats stale CSS rules */
+#upgrade-btn[hidden] { display: none !important; }

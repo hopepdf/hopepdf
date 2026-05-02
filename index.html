@@ -284,18 +284,23 @@
   <!-- ─────────── HEADER ─────────── -->
   <header class="nav" id="nav">
     <div class="nav-inner">
-      <!-- Logo: dark round badge with flower icon + "H🌸PE PDF" wordmark
-           where the central O is the flower. Inline SVG only — no external
-           image to 404 in production. -->
+      <!-- Logo: self-contained inline SVG (no <use>, no gradient refs).
+           Renders identically in every browser, on Vercel, never 404s. -->
       <a href="#home" class="brand logo" data-link aria-label="HOPE PDF">
         <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 100 100" class="brand-mark-svg"><use href="#hope-flower"/></svg>
+          <svg class="brand-mark-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50" cy="50" r="48" fill="#150a14"/>
+            <g transform="translate(50 50) rotate(-18)">
+              <circle cx="0"      cy="-22"  r="13" fill="#f4a98c"/>
+              <circle cx="20.92"  cy="-6.8" r="13" fill="#f4a98c"/>
+              <circle cx="12.93"  cy="17.8" r="13" fill="#f4a98c"/>
+              <circle cx="-12.93" cy="17.8" r="13" fill="#f4a98c"/>
+              <circle cx="-20.92" cy="-6.8" r="13" fill="#f4a98c"/>
+              <circle cx="0" cy="0" r="6" fill="#fffaf0"/>
+            </g>
+          </svg>
         </span>
-        <span class="brand-title">
-          H<span class="brand-flower" aria-hidden="true">
-            <svg class="hope-flower-svg" viewBox="0 0 100 100"><use href="#hope-flower"/></svg>
-          </span>PE&nbsp;PDF
-        </span>
+        <span class="brand-title">HOPE&nbsp;PDF</span>
       </a>
 
       <nav class="nav-links" aria-label="Primary">
