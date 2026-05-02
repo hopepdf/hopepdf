@@ -49,7 +49,7 @@ COPY . .
 RUN echo "=== Verifying converters ===" \
  && python3 --version \
  && pip3 --version \
- && python3 -m pdf2docx --help > /dev/null \
+ && pdf2docx --help > /dev/null \
  && echo "✓ pdf2docx CLI works" \
  && which soffice \
  && soffice --version \
