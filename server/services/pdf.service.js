@@ -131,15 +131,11 @@ async function toWord(filePath) {
     throw err;
   }
 
-  // 2) Real conversion via LibreOffice.
-  const ok = await libreoffice.isAvailable();
-  if (!ok) {
-    const err = new Error('LibreOffice is not installed on the server. Install with: apt-get install -y libreoffice-core libreoffice-writer');
-    err.code = 'LIBREOFFICE_MISSING';
-    throw err;
-  }
+  // 2) Real conversion. convertPdfToDocx auto-selects:
+  //      LibreOffice (preferred) → Python pdf2docx (fallback) → error.
+  //    Internally serialised to one job at a time across the process.
   const outDir = path.join(path.dirname(filePath), `out-${Date.now()}`);
-  return await libreoffice.convert(filePath, outDir, 'docx');
+  return await libreoffice.convertPdfToDocx(filePath, outDir);
 }
 
 module.exports = { merge, split, compress, toJpg, toWord };

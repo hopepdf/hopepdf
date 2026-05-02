@@ -722,120 +722,130 @@
     const authSlot    = $('#auth-slot');
     if (!planBadge || !upgradeBtn || !authSlot) return;
 
+    /* Single source of truth for the auth slot.
+     *   Signed in  → Google-style profile button + dropdown card with
+     *                avatar / name / email / plan-tinted card / actions
+     *   Signed out → empty #googleSignInContainer; HopeAuth.initGoogle
+     *                renders the one-and-only Google button into it.
+     *
+     * Plan-based card styling:
+     *   premium-yearly  → "gold"   (gold gradient + glow)
+     *   premium-monthly → "silver" (silver gradient)
+     *   free            → "free"   (dark theme)
+     *
+     * Upgrade button: tinted gold and disabled when the user is already
+     * on a premium plan. */
+    function classForPlan(p) {
+      if (p === 'premium-yearly')  return 'gold';
+      if (p === 'premium-monthly') return 'silver';
+      return 'free';
+    }
+
+    function tagForPlan(p) {
+      if (p === 'premium-yearly')  return 'PREMIUM YEARLY';
+      if (p === 'premium-monthly') return 'PREMIUM MONTHLY';
+      return 'FREE';
+    }
+
     function syncBadgeAndSlot() {
       const u = window.HopeAuth.getUser();
       const p = window.HopeAuth.plan();
       const label = window.HopeAuth.PLANS[p].label;
       planBadge.textContent = p === 'free' ? 'Free' : label;
       planBadge.dataset.plan = p;
+
+      // Upgrade button — gold + disabled when already premium
+      const isPrem = p !== 'free';
+      upgradeBtn.dataset.plan = p;
+      upgradeBtn.textContent  = isPrem ? '★ Premium' : 'Upgrade';
+      upgradeBtn.disabled     = isPrem;
+      upgradeBtn.classList.toggle('is-gold', isPrem);
+
       if (u) {
+        const initial = (u.name || u.email || '?').trim().charAt(0).toUpperCase();
+        const cardCls = classForPlan(p);
+        const tag     = tagForPlan(p);
+        const avatarUrl = u.picture ? escapeHtml(u.picture) : '';
+
         authSlot.innerHTML = `
-          <span class="user-chip" title="${escapeHtml(u.email)}">${escapeHtml((u.name || u.email).split(' ')[0])}</span>
-          <button class="ghost-pill small" id="signout-btn" type="button">Sign out</button>`;
-        $('#signout-btn').addEventListener('click', () => {
+          <button id="profileBtn" class="profile-btn" type="button"
+                  aria-haspopup="true" aria-expanded="false" aria-label="Account">
+            ${avatarUrl
+              ? `<img class="profile-avatar" src="${avatarUrl}" alt="${escapeHtml(u.name || u.email)}" referrerpolicy="no-referrer" />`
+              : `<span class="profile-avatar profile-avatar-fallback" aria-hidden="true">${escapeHtml(initial)}</span>`}
+          </button>
+
+          <div id="accountPopup" class="account-popup hidden" role="dialog" aria-label="Account">
+            <div class="account-card account-card-${cardCls}">
+              <div class="account-head">
+                ${avatarUrl
+                  ? `<img class="account-avatar-lg" src="${avatarUrl}" alt="" referrerpolicy="no-referrer" />`
+                  : `<span class="account-avatar-lg account-avatar-fallback" aria-hidden="true">${escapeHtml(initial)}</span>`}
+                <div class="account-id">
+                  <div class="account-name">${escapeHtml(u.name || u.email)}</div>
+                  <div class="account-email" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}</div>
+                </div>
+              </div>
+              <span class="account-plan-tag account-plan-${cardCls}">${tag}</span>
+              <div class="account-actions">
+                <button id="manageAccountBtn" type="button" class="account-btn ghost">Manage Account</button>
+                <button id="signOutBtn"       type="button" class="account-btn danger">Sign Out</button>
+              </div>
+            </div>
+          </div>`;
+
+        // ── Popup wiring ─────────────────────────────────────────
+        const profileBtn = $('#profileBtn');
+        const popup      = $('#accountPopup');
+
+        function closePopup() {
+          popup.classList.add('hidden');
+          profileBtn.setAttribute('aria-expanded', 'false');
+        }
+        function openPopup() {
+          popup.classList.remove('hidden');
+          profileBtn.setAttribute('aria-expanded', 'true');
+        }
+
+        profileBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          popup.classList.contains('hidden') ? openPopup() : closePopup();
+        });
+
+        // Click outside / Esc to close
+        document.addEventListener('click', (e) => {
+          if (popup.classList.contains('hidden')) return;
+          if (!popup.contains(e.target) && e.target !== profileBtn) closePopup();
+        }, true);
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && !popup.classList.contains('hidden')) closePopup();
+        });
+
+        // Manage Account → opens the existing pricing modal so the user
+        // can change plan / see status. Keeps logic in one place.
+        $('#manageAccountBtn').addEventListener('click', () => {
+          closePopup();
+          openPricingModal();
+        });
+
+        // Sign out — clear the verified user and reload (per spec).
+        $('#signOutBtn').addEventListener('click', () => {
           window.HopeAuth.signOut();
-          // Also clear the GIS-set "user" key so auto-login on reload doesn't restore.
-          try { localStorage.removeItem('user'); } catch (_) {}
-          toast('info', 'Signed out', 'Come back any time.');
+          try { localStorage.removeItem('hope.user'); } catch (_) {}
+          location.reload();
         });
       } else {
-        // The new HTML layout already provides #googleSignInContainer
-        // (for GIS pop-up) and #googleLoginBtn (for the redirect flow),
-        // both wired in auth.js. Don't wipe them — just initialize GIS
-        // into the inner container if it's there, otherwise fall back
-        // to the legacy single-slot rendering.
-        const innerGis = authSlot.querySelector('#googleSignInContainer');
-        if (innerGis) {
-          initGoogleSignIn();
-          if (window.HopeAuth && window.HopeAuth.initGoogle) {
-            window.HopeAuth.initGoogle(innerGis);
-          }
-        } else {
-          authSlot.innerHTML = `
-            <button type="button" class="g-fallback-btn" id="g-login-btn">
-              <span class="g-mark" aria-hidden="true">G</span> Continue with Google
-            </button>`;
-          initGoogleSignIn();
-          $('#g-login-btn').addEventListener('click', () => {
-            if (window.google && window.google.accounts && window.google.accounts.id) {
-              window.google.accounts.id.prompt();
-            } else {
-              toast('error', 'Google not loaded', 'Check your connection and refresh.');
-            }
-          });
+        authSlot.innerHTML = `<div id="googleSignInContainer"></div>`;
+        if (window.HopeAuth.initGoogle) {
+          window.HopeAuth.initGoogle(authSlot.querySelector('#googleSignInContainer'));
         }
       }
     }
-
-    /* ── Google Identity Services (real Client ID) ───────────────── */
-    const GOOGLE_CLIENT_ID = "165450201442-6f6ls3vsn41r5qlk3v5089pro7h0l625.apps.googleusercontent.com";
-
-    function initGoogleSignIn() {
-      if (!window.google || !window.google.accounts || !window.google.accounts.id) return;
-      try {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleCredentialResponse,
-          auto_select: false
-        });
-      } catch (e) { /* GIS already initialized — safe to ignore */ }
-    }
-
-    // Decode JWT payload (no signature verification — that's GIS's job).
-    function parseJwt(token) {
-      const base64Url  = token.split('.')[1];
-      const base64     = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(
-        atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
-      );
-      return JSON.parse(jsonPayload);
-    }
-
-    // Called by GIS once the user picks their Google account.
-    function handleCredentialResponse(response) {
-      try {
-        const profile = parseJwt(response.credential);
-        if (!profile || !profile.email) return;
-
-        // Per-spec: also store under "user" key for any code that reads it.
-        localStorage.setItem('user', JSON.stringify(profile));
-
-        // Keep the existing plan/Razorpay/limits flow intact by writing
-        // through HopeAuth so badge + quotas + expiry stay consistent.
-        const existing = window.HopeAuth.getUser() || {};
-        window.HopeAuth.saveUser({
-          email:     profile.email,
-          name:      profile.name || profile.email,
-          picture:   profile.picture || null,
-          plan:      existing.plan || 'free',
-          expiresAt: existing.expiresAt || null,
-          ts:        Date.now()
-        });
-
-        updateUIAfterLogin(profile);
-        toast('success', 'Signed in', `Welcome, ${(profile.name || profile.email).split(' ')[0]}!`);
-      } catch (e) {
-        console.error('Google login failed:', e);
-        toast('error', 'Login failed', 'Could not parse Google response.');
-      }
-    }
-
-    // Refresh the auth slot so the user-chip + sign-out button appear.
-    function updateUIAfterLogin(/*user*/) { syncBadgeAndSlot(); }
 
     syncBadgeAndSlot();
     window.HopeAuth.onChange(syncBadgeAndSlot);
     // GIS may finish loading after first paint — re-render the button then.
     setTimeout(syncBadgeAndSlot, 1500);
-
-    // Auto-login on reload (works whether the session is stored under
-    // "hope.user" by HopeAuth or "user" by handleCredentialResponse).
-    (function autoLoginOnReload() {
-      try {
-        const cached = JSON.parse(localStorage.getItem('user') || 'null');
-        if (cached && cached.email) updateUIAfterLogin(cached);
-      } catch (_) { /* ignore parse errors */ }
-    })();
 
     upgradeBtn.addEventListener('click', openPricingModal);
 

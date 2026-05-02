@@ -2066,3 +2066,168 @@ body[data-theme="light"] .ghost-pill:hover { background: rgba(0, 0, 0, .04); }
 body[data-theme="light"] .pricing-card { background: rgba(0, 0, 0, .03); border-color: rgba(0, 0, 0, .1); }
 body[data-theme="light"] .plan-badge   { background: rgba(0, 0, 0, .05); border-color: rgba(0, 0, 0, .1); color: #5f687b; }
 body[data-theme="light"] .user-chip    { background: rgba(0, 0, 0, .04); border-color: rgba(0, 0, 0, .12); color: #1f2433; }
+
+/* ================================================================
+   Navbar logo — clean image + text (replaces the 5-dot SVG)
+   ================================================================ */
+.brand.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.logo-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+.logo-text {
+  font-weight: 600;
+  font-size: 18px;
+  color: #fff;
+  letter-spacing: 0.2px;
+}
+body[data-theme="light"] .logo-text { color: #1a0f14; }
+
+/* ================================================================
+   Account dropdown — Google-style profile button + popup card
+   Plan-based tinting:
+     gold   → premium yearly (linear gradient + glow)
+     silver → premium monthly
+     free   → dark base
+   ================================================================ */
+
+.auth-slot { position: relative; }
+
+/* Round profile button in the navbar */
+.profile-btn {
+  width: 36px; height: 36px; padding: 0;
+  border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+  cursor: pointer; overflow: hidden;
+  display: inline-grid; place-items: center;
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+.profile-btn:hover { transform: scale(1.04); box-shadow: 0 0 0 3px rgba(255, 175, 109, .25); }
+.profile-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  object-fit: cover; display: block;
+}
+.profile-avatar-fallback {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 14px;
+  background: linear-gradient(135deg, #ffb1c8, #e6b352);
+  color: #1a0f14;
+}
+
+/* Popup card */
+.account-popup {
+  position: absolute;
+  top: calc(100% + 12px); right: 0;
+  z-index: 70; min-width: 300px;
+  animation: accountPopIn .18s ease;
+}
+.account-popup.hidden { display: none; }
+@keyframes accountPopIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.account-card {
+  border-radius: 18px;
+  padding: 18px 18px 14px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, .45);
+}
+
+/* — Plan tints — */
+.account-card-gold {
+  background: linear-gradient(135deg, #FFD700, #FFB300);
+  color: #1a0f00;
+  box-shadow: 0 0 28px rgba(255, 215, 0, .55), 0 22px 50px rgba(0, 0, 0, .35);
+  border-color: rgba(255, 230, 130, .65);
+}
+.account-card-silver {
+  background: linear-gradient(135deg, #E9E9EE, #B7B7BD);
+  color: #14161d;
+  border-color: rgba(0, 0, 0, .08);
+}
+.account-card-free {
+  background: linear-gradient(180deg, #14161d, #0d0e15);
+  color: #fff;
+}
+
+.account-head {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 12px;
+}
+.account-avatar-lg {
+  width: 48px; height: 48px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, .35);
+}
+.account-avatar-lg.account-avatar-fallback {
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 18px;
+  background: linear-gradient(135deg, #ffb1c8, #e6b352);
+  color: #1a0f14;
+}
+.account-id { min-width: 0; flex: 1; }
+.account-name {
+  font-weight: 700; font-size: 15px; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.account-email {
+  font-size: 12px; opacity: .85;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.account-plan-tag {
+  display: inline-block;
+  font-size: 10px; font-weight: 800;
+  letter-spacing: .12em;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgba(0, 0, 0, .18);
+  color: inherit;
+}
+.account-plan-gold   { background: rgba(0, 0, 0, .25); color: #1a0f00; }
+.account-plan-silver { background: rgba(0, 0, 0, .15); color: #14161d; }
+.account-plan-free   { background: rgba(255, 255, 255, .08); color: #ddd; }
+
+.account-actions {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; margin-top: 14px;
+}
+.account-btn {
+  border: 0; cursor: pointer;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px; font-weight: 600;
+  transition: filter .15s ease, transform .15s ease;
+}
+.account-btn.ghost {
+  background: rgba(255, 255, 255, .12);
+  color: inherit;
+}
+.account-card-gold   .account-btn.ghost,
+.account-card-silver .account-btn.ghost {
+  background: rgba(0, 0, 0, .12);
+}
+.account-btn.danger {
+  background: #d94c4c;
+  color: #fff;
+}
+.account-btn:hover { filter: brightness(1.08); }
+.account-btn:active { transform: translateY(1px); }
+
+/* Upgrade button: gold + disabled when premium */
+.ghost-pill.is-gold {
+  background: linear-gradient(90deg, #FFD700, #FFB300);
+  color: #1a0f00;
+  border-color: transparent;
+  font-weight: 700;
+  cursor: default;
+}
+.ghost-pill.is-gold:hover { filter: none; transform: none; }
+.ghost-pill[disabled] { opacity: 1; }

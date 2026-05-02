@@ -18,9 +18,10 @@
  * ================================================================ */
 window.HopeAuth = (() => {
   // ---------- CONFIG --------------------------------------------------
-  const GOOGLE_CLIENT_ID  = 'REPLACE_WITH_YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+  const GOOGLE_CLIENT_ID  = '165450201442-6f6ls3vsn41r5qlk3v5089pro7h0l625.apps.googleusercontent.com';
   const RAZORPAY_KEY_ID   = 'rzp_test_REPLACE_ME';
   const VERIFY_ENDPOINT   = '/api/razorpay/verify';
+  const BACKEND_URL       = 'https://hopepdf-api.onrender.com';
 
   const PLANS = {
     free:              { label: 'Free',            maxFileBytes: 20  * 1024 * 1024, hourlyQuota: 5,   dailyQuota: 8,   ads: true,  priceInr: 0    },
@@ -83,49 +84,55 @@ window.HopeAuth = (() => {
     localStorage.setItem('hope.usage', JSON.stringify(usage));
   }
 
-  // ---------- Google Sign-In ----------------------------------------
-  function decodeJwt(token) {
+  // ---------- Google Sign-In (GIS only, popup mode) ------------------
+  // Strict rules:
+  //   • google.accounts.id.initialize() runs at most once per page load
+  //     (idempotent flag below).
+  //   • renderButton() may be called many times — fine.
+  //   • handleCredential POSTs the idToken to the backend, stores the
+  //     verified user under "hope.user" and reloads.
+
+  let gisInitialized = false;
+
+  async function handleCredential(resp) {
     try {
-      const p = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-      const json = decodeURIComponent(atob(p).split('').map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
-      return JSON.parse(json);
-    } catch (_) { return null; }
+      const r = await fetch(`${BACKEND_URL}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: resp.credential })
+      });
+      const data = await r.json();
+      if (data.ok && data.user) {
+        localStorage.setItem('hope.user', JSON.stringify(data.user));
+        location.reload();
+      } else {
+        console.error('Login failed', data);
+      }
+    } catch (err) {
+      console.error('Login failed', err);
+    }
   }
-  function handleCredential(resp) {
-    const data = decodeJwt(resp.credential);
-    if (!data || !data.email) return;
-    const existing = getUser();
-    saveUser({
-      email: data.email,
-      name: data.name || data.email,
-      plan: (existing && existing.plan) || 'free',
-      expiresAt: existing ? existing.expiresAt : null,
-      ts: Date.now()
-    });
-  }
+
   function initGoogle(buttonContainer) {
     if (!buttonContainer) return;
-    const fallback = () => {
-      buttonContainer.innerHTML = '';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'g-fallback-btn';
-      btn.innerHTML = `<span class="g-mark" aria-hidden="true">G</span> Continue with Google`;
-      btn.addEventListener('click', () => {
-        if (GOOGLE_CLIENT_ID.startsWith('REPLACE_')) {
-          // demo mode so the rest of the UI is testable
-          saveUser({ email: 'demo@hope.pdf', name: 'Demo', plan: 'free', expiresAt: null, ts: Date.now() });
-        } else if (window.google && google.accounts) {
-          google.accounts.id.prompt();
-        }
-      });
-      buttonContainer.appendChild(btn);
-    };
-    if (!window.google || !google.accounts || !google.accounts.id) return fallback();
+    if (!window.google || !google.accounts || !google.accounts.id) return;
     try {
-      google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleCredential, auto_select: false });
-      google.accounts.id.renderButton(buttonContainer, { type: 'standard', theme: 'filled_black', size: 'medium', text: 'continue_with', shape: 'pill' });
-    } catch (_) { fallback(); }
+      if (!gisInitialized) {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleCredential
+        });
+        gisInitialized = true;
+      }
+      buttonContainer.innerHTML = '';
+      google.accounts.id.renderButton(buttonContainer, {
+        theme: 'outline',
+        size:  'large',
+        width: 220
+      });
+    } catch (e) {
+      console.error('GIS init/render failed', e);
+    }
   }
   function signOut() {
     if (window.google && google.accounts && google.accounts.id) {
@@ -203,84 +210,19 @@ window.HopeAuth = (() => {
   };
 })();
 
+
 /* ================================================================
- * Google OAuth — redirect flow (server-side code exchange)
+ * Google sign-in bootstrap.
  *
- * Lives OUTSIDE the HopeAuth IIFE so it runs at DOM ready without
- * touching any of the existing HopeAuth state.
- *
- *   1) #googleLoginBtn  → window.location → backend /auth/google
- *   2) Backend redirects to Google, then back to /auth/google/callback
- *   3) Backend issues a JWT and redirects FRONTEND_URL?token=…
- *   4) On the next page load we read ?token= from the URL, decode the
- *      embedded user, hand it to HopeAuth so the plan/badge stays
- *      consistent, then strip the token from the URL.
+ *   • This is the ONLY place GIS is wired up at DOM ready.
+ *   • HopeAuth.initGoogle does the single google.accounts.id.initialize()
+ *     and the renderButton() call. It's idempotent.
+ *   • script.js's setupAuthUi re-calls it whenever the auth state
+ *     changes (sign in / sign out) — same one-time init under the hood.
  * ================================================================ */
-const API_URL = "https://hopepdf-api.onrender.com";
-
 document.addEventListener("DOMContentLoaded", () => {
-  // 1) The standalone "Continue with Google" button → server redirect flow
-  
-
-  // 2) The GIS pop-up container (handled by HopeAuth.initGoogle)
   const container = document.getElementById("googleSignInContainer");
-  if (container && window.HopeAuth && HopeAuth.initGoogle) {
-    HopeAuth.initGoogle(container);
+  if (container && window.HopeAuth && window.HopeAuth.initGoogle) {
+    window.HopeAuth.initGoogle(container);
   }
-  async function handleCredential(resp) {
-  try {
-    const r = await fetch("https://hopepdf-api.onrender.com/auth/google", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        idToken: resp.credential
-      })
-    });
-
-    const data = await r.json();
-
-    if (data.ok) {
-      localStorage.setItem("hope.user", JSON.stringify(data.user));
-      location.reload();
-    }
-  } catch (err) {
-    console.error("Login failed", err);
-  }
-}
-
-  // 3) Pick up ?token=… returned by the OAuth callback and seed HopeAuth
-  //    so the existing plan + badge UI updates without a second sign-in.
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
-    if (token && window.HopeAuth) {
-      const payload = token.split(".")[1];
-      if (payload) {
-        const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-        const profile = JSON.parse(decodeURIComponent(escape(json)));
-        if (profile && profile.email) {
-          const existing = window.HopeAuth.getUser() || {};
-          // Use saveUser via the public surface — no IIFE state mutation.
-          if (window.HopeAuth.PLANS) {
-            localStorage.setItem("user", JSON.stringify(profile));
-            localStorage.setItem("hope.user", JSON.stringify({
-              email: profile.email,
-              name:  profile.name || profile.email,
-              picture: profile.picture || null,
-              role:  profile.role || "user",
-              plan:  existing.plan || "free",
-              expiresAt: existing.expiresAt || null,
-              ts: Date.now()
-            }));
-          }
-          // Strip the token from the URL so it isn't bookmarked.
-          params.delete("token");
-          const clean = window.location.pathname + (params.toString() ? `?${params}` : "") + window.location.hash;
-          window.history.replaceState({}, document.title, clean);
-        }
-      }
-    }
-  } catch (_) { /* ignore — token parse is best-effort */ }
 });
