@@ -284,8 +284,11 @@
   <!-- ─────────── HEADER ─────────── -->
   <header class="nav" id="nav">
     <div class="nav-inner">
-      <a href="#home" class="brand logo" data-link>
-        <img src="/assets/logo.png" alt="HOPE PDF" class="logo-img" />
+      <!-- Logo: inline SVG (no external file → never shows broken-image "?"). -->
+      <a href="#home" class="brand logo" data-link aria-label="HOPE PDF">
+        <svg class="logo-icon" viewBox="0 0 100 100" aria-hidden="true">
+          <use href="#hope-flower"/>
+        </svg>
         <span class="logo-text">HOPE PDF</span>
       </a>
 

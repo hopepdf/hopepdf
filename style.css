@@ -2068,24 +2068,29 @@ body[data-theme="light"] .plan-badge   { background: rgba(0, 0, 0, .05); border-
 body[data-theme="light"] .user-chip    { background: rgba(0, 0, 0, .04); border-color: rgba(0, 0, 0, .12); color: #1f2433; }
 
 /* ================================================================
-   Navbar logo — clean image + text (replaces the 5-dot SVG)
+   Navbar logo — inline flower SVG + text (no external image)
    ================================================================ */
 .brand.logo {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   text-decoration: none;
+  line-height: 1;
 }
-.logo-img {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
+.logo-icon {
+  width: 32px; height: 32px;
+  display: block;
+  filter: drop-shadow(0 0 8px rgba(255, 200, 100, .55));
 }
 .logo-text {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 18px;
+  letter-spacing: .3px;
   color: #fff;
-  letter-spacing: 0.2px;
+  background: linear-gradient(90deg, #ffd9b5, #e6b352);
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 body[data-theme="light"] .logo-text { color: #1a0f14; }
 
@@ -2274,4 +2279,55 @@ body[data-theme="light"] .logo-text { color: #1a0f14; }
 /* Subtle warm glow on the navbar logo image */
 .logo-img {
   filter: drop-shadow(0 0 8px rgba(255, 200, 100, 0.6));
+}
+
+/* ================================================================
+   Navbar polish — same height, same baseline, even spacing
+   for every control on the right side of the navbar.
+   ================================================================ */
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+/* Make every interactive element in nav-actions hit a single height. */
+.nav-actions .plan-badge,
+.nav-actions .ghost-pill,
+.nav-actions .gold-google-btn,
+.nav-actions .icon-btn,
+.nav-actions .nav-search-wrap,
+.nav-actions .profile-btn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+}
+.nav-actions .icon-btn {
+  width: 36px;
+  justify-content: center;
+  padding: 0;
+}
+.nav-actions .plan-badge {
+  padding: 0 12px;
+  line-height: 36px;
+}
+.nav-actions .ghost-pill,
+.nav-actions .gold-google-btn {
+  padding: 0 16px;
+  white-space: nowrap;
+}
+.nav-actions .nav-search-wrap {
+  padding: 0 12px;
+  border-radius: 999px;
+}
+/* Drop the heavy box around the search input — keeps the bar visually light */
+.nav-actions .nav-search-input { padding: 0 6px; height: 100%; }
+
+/* Search bar collapses on tighter widths, badges auto-trim */
+@media (max-width: 1080px) {
+  .nav-actions .plan-badge { display: none; }
+}
+@media (max-width: 880px) {
+  .nav-actions .nav-search { display: none; }
 }
