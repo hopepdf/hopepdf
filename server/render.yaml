@@ -36,7 +36,3 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         sync: false
-      - key: FREE_HOURLY_QUOTA
-        value: "5"
-      - key: PREMIUM_HOURLY_QUOTA
-        value: "200"

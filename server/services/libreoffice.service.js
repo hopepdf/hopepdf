@@ -149,7 +149,7 @@ function convert(inputPath, outputDir, targetFormat) {
  * PDF → DOCX with strict engine priority.
  *   1) Python pdf2docx (PRIMARY) — selectable text + real tables.
  *   2) LibreOffice (FALLBACK)    — only if pdf2docx errors out.
- *   3) NO_CONVERTER              — neither engine present.
+ *   3) CONVERSION_FAILED         — neither engine present.
  *
  * Output is sanity-checked: if it's larger than 50 MB AND > 5× the
  * input size, that's a smell of an image-based DOCX leaking through —
@@ -175,8 +175,8 @@ async function convertPdfToDocx(inputPath, outputDir) {
       console.log('[pdf→docx] Using fallback: LibreOffice');
       outPath = await runSerial(() => rawSoffice(inputPath, outputDir, 'docx'));
     } else {
-      const err = new Error('No PDF→DOCX engine available. Install pdf2docx (pip install pdf2docx) or LibreOffice (apt-get install libreoffice-core libreoffice-writer).');
-      err.code = 'NO_CONVERTER';
+      const err = new Error('Could not convert this PDF. Install pdf2docx or LibreOffice on the server.');
+      err.code = 'CONVERSION_FAILED';
       throw err;
     }
   }

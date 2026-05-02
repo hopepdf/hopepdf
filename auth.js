@@ -196,25 +196,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const payload = JSON.parse(decodeURIComponent(escape(json)));
 
     if (payload && payload.email) {
+      // Backend forces every authenticated user to premium — write
+      // that into hope.user so the UI shows the right plan tier
+      // immediately after login.
       localStorage.setItem("hope.user", JSON.stringify({
         email:     payload.email,
         name:      payload.name || payload.email,
         picture:   payload.picture || null,
-        plan:      payload.plan || "free",
-        expiresAt: payload.expiresAt || null,
+        plan:      "premium",
+        expiresAt: null,
         role:      payload.role || "user",
         ts:        Date.now()
       }));
-      // Notify any HopeAuth.onChange listeners (script.js syncs the UI).
-      window.dispatchEvent(new Event("storage"));
-    }
 
-    // Strip the token so it isn't bookmarked.
-    params.delete("token");
-    const clean = window.location.pathname
-                + (params.toString() ? `?${params}` : "")
-                + window.location.hash;
-    window.history.replaceState({}, document.title, clean);
+      // Strip the token so it isn't bookmarked, then full-reload so
+      // every module (animations, tools, navbar) re-initialises with
+      // the freshly-stored user. No stale UI state possible.
+      params.delete("token");
+      const clean = window.location.pathname
+                  + (params.toString() ? `?${params}` : "")
+                  + window.location.hash;
+      window.history.replaceState({}, document.title, clean);
+      window.location.reload();
+    }
   } catch (_) {
     /* token parse errors are best-effort — ignore */
   }

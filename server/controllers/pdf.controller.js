@@ -99,11 +99,15 @@ async function toWord(req, res, next) {
     res.json({ ok: true, files: manifest });
   } catch (e) {
     cleanupRequest(req);
-    if (e && e.code === 'NO_TEXT_LAYER')   return res.status(422).json({ ok: false, code: e.code, error: e.message });
-    if (e && (e.code === 'LIBREOFFICE_MISSING' || e.code === 'NO_CONVERTER')) {
-      return res.status(503).json({ ok: false, code: e.code, error: e.message });
+    if (e && e.code === 'NO_TEXT_LAYER') {
+      return res.status(422).json({ ok: false, code: 'NO_TEXT_LAYER', error: e.message });
     }
-    next(e);
+    // Standardised single error code for any conversion failure.
+    return res.status(500).json({
+      ok: false,
+      code: 'CONVERSION_FAILED',
+      error: (e && e.message) || 'Conversion failed.'
+    });
   }
 }
 
