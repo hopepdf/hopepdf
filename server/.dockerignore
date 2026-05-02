@@ -1,0 +1,20 @@
+# Keep the build context small + reproducible.
+node_modules
+npm-debug.log
+.env
+.env.*
+.git
+.gitignore
+.DS_Store
+*.log
+
+# Runtime state — never bake into the image.
+uploads/*
+!uploads/.gitkeep
+data/*
+!data/.gitkeep
+
+# Render-specific files (image doesn't need them).
+render.yaml
+install.sh
+README.md

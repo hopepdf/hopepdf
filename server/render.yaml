@@ -1,20 +1,25 @@
-# Render blueprint — paste into Render dashboard or `render.yaml` at repo root.
+# Render blueprint — Docker-based service.
+#
+# We deliberately use Docker (not the native Node env) because pdf2docx
+# requires guaranteed python3 + pip3 + apt access at build time. The
+# Dockerfile bakes everything in a verified image; render.yaml only
+# tells Render where the Dockerfile lives.
+
 services:
   - type: web
     name: hope-pdf-server
-    env: node
+    env: docker
     rootDir: server
-    # All system + Python deps live in install.sh (set -e + verification).
-    # If pdf2docx fails to install, the build fails fast — never silently.
-    # If your Render plan blocks apt-get at build time, switch to a
-    # Dockerfile-based service and copy install.sh into the image.
-    buildCommand: bash ./install.sh && npm install
-    startCommand: npm start
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: "5000"
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
@@ -31,10 +36,6 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         sync: false
-      - key: FREE_MAX_FILE_MB
-        value: "20"
-      - key: PREMIUM_MAX_FILE_MB
-        value: "100"
       - key: FREE_HOURLY_QUOTA
         value: "5"
       - key: PREMIUM_HOURLY_QUOTA
