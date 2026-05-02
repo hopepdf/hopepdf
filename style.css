@@ -2231,3 +2231,47 @@ body[data-theme="light"] .logo-text { color: #1a0f14; }
 }
 .ghost-pill.is-gold:hover { filter: none; transform: none; }
 .ghost-pill[disabled] { opacity: 1; }
+
+/* ================================================================
+   Custom golden "Continue with Google" button
+   (replaces the default GIS-rendered button — single login surface)
+   ================================================================ */
+.gold-google-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #FFD700, #FFB300);
+  color: #000;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: .01em;
+  box-shadow: 0 0 12px rgba(255, 215, 0, .5);
+  transition: transform .25s ease, box-shadow .25s ease, filter .25s ease;
+  white-space: nowrap;
+}
+.gold-google-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 22px rgba(255, 215, 0, .85);
+}
+.gold-google-btn:active { transform: scale(.98); }
+.gold-google-btn img {
+  width: 18px; height: 18px;
+  display: block;
+  background: #fff;
+  border-radius: 50%;
+  padding: 1px;
+}
+@media (max-width: 700px) {
+  .gold-google-btn { padding: 8px 14px; font-size: 13px; }
+  .gold-google-btn span { display: none; } /* icon-only on tiny screens */
+  .gold-google-btn { gap: 0; }
+}
+
+/* Subtle warm glow on the navbar logo image */
+.logo-img {
+  filter: drop-shadow(0 0 8px rgba(255, 200, 100, 0.6));
+}

@@ -367,10 +367,9 @@
         <!-- Plan + auth (wired by auth.js / script.js) -->
         <span class="plan-badge" id="plan-badge" title="Your current plan">Free</span>
         <button id="upgrade-btn" class="ghost-pill" type="button" title="See plans">Upgrade</button>
-        <div id="auth-slot" class="auth-slot" aria-label="Account">
-          <!-- Single Google sign-in surface (rendered by GIS) -->
-          <div id="googleSignInContainer"></div>
-        </div>
+        <!-- Single auth surface — script.js renders either the custom
+             gold "Continue with Google" button OR the profile dropdown. -->
+        <div id="auth-slot" class="auth-slot" aria-label="Account"></div>
 
         <div class="nav-search" role="search">
           <label class="nav-search-wrap" for="tool-search">

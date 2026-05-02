@@ -212,17 +212,49 @@ window.HopeAuth = (() => {
 
 
 /* ================================================================
- * Google sign-in bootstrap.
+ * OAuth redirect callback hand-off.
  *
- *   • This is the ONLY place GIS is wired up at DOM ready.
- *   • HopeAuth.initGoogle does the single google.accounts.id.initialize()
- *     and the renderButton() call. It's idempotent.
- *   • script.js's setupAuthUi re-calls it whenever the auth state
- *     changes (sign in / sign out) — same one-time init under the hood.
+ *   We use the server-side OAuth redirect flow (custom gold button →
+ *   backend /auth/google → Google → /auth/google/callback → JWT in
+ *   ?token=… query param). On the next page load we decode the token
+ *   payload, store the verified user under "hope.user", then strip
+ *   the token from the URL so it isn't bookmarked or shared.
+ *
+ *   GIS popup mode is no longer used — the custom button takes over.
  * ================================================================ */
 document.addEventListener("DOMContentLoaded", () => {
-  const container = document.getElementById("googleSignInContainer");
-  if (container && window.HopeAuth && window.HopeAuth.initGoogle) {
-    window.HopeAuth.initGoogle(container);
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const token  = params.get("token");
+    if (!token) return;
+
+    const payloadPart = token.split(".")[1];
+    if (!payloadPart) return;
+
+    const json    = atob(payloadPart.replace(/-/g, "+").replace(/_/g, "/"));
+    const payload = JSON.parse(decodeURIComponent(escape(json)));
+
+    if (payload && payload.email) {
+      localStorage.setItem("hope.user", JSON.stringify({
+        email:     payload.email,
+        name:      payload.name || payload.email,
+        picture:   payload.picture || null,
+        plan:      payload.plan || "free",
+        expiresAt: payload.expiresAt || null,
+        role:      payload.role || "user",
+        ts:        Date.now()
+      }));
+      // Notify any HopeAuth.onChange listeners (script.js syncs the UI).
+      window.dispatchEvent(new Event("storage"));
+    }
+
+    // Strip the token so it isn't bookmarked.
+    params.delete("token");
+    const clean = window.location.pathname
+                + (params.toString() ? `?${params}` : "")
+                + window.location.hash;
+    window.history.replaceState({}, document.title, clean);
+  } catch (_) {
+    /* token parse errors are best-effort — ignore */
   }
 });

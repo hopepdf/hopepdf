@@ -835,10 +835,18 @@
           location.reload();
         });
       } else {
-        authSlot.innerHTML = `<div id="googleSignInContainer"></div>`;
-        if (window.HopeAuth.initGoogle) {
-          window.HopeAuth.initGoogle(authSlot.querySelector('#googleSignInContainer'));
-        }
+        // Signed out → single custom gold "Continue with Google" button.
+        // Click → server-side OAuth redirect (handled by passport at
+        // GET /auth/google → /auth/google/callback → ?token= back).
+        const BACKEND = 'https://hopepdf-api.onrender.com';
+        authSlot.innerHTML = `
+          <button id="googleLoginBtn" type="button" class="gold-google-btn" aria-label="Continue with Google">
+            <img src="https://developers.google.com/identity/images/g-logo.png" alt="" width="18" height="18" />
+            <span>Continue with Google</span>
+          </button>`;
+        $('#googleLoginBtn').addEventListener('click', () => {
+          window.location.href = `${BACKEND}/auth/google`;
+        });
       }
     }
 
