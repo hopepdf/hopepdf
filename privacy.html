@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Privacy Policy · HOPE PDF</title>
+<meta name="description" content="HOPE PDF privacy policy — what data we collect, what we do with it, what we never do." />
+<meta name="robots" content="index,follow" />
+<link rel="canonical" href="https://hope-pdf.app/privacy.html" />
+<link rel="stylesheet" href="style.css" />
+<style>
+  .legal-page { max-width: 760px; margin: 80px auto; padding: 0 24px; line-height: 1.65; }
+  .legal-page h1 { font-size: 2rem; margin-bottom: .25em; }
+  .legal-page h2 { margin-top: 2em; font-size: 1.15rem; color: #ffd9b5; }
+  .legal-page p, .legal-page li { color: #c8c8d0; }
+  .legal-page a.back { display: inline-block; margin-top: 2em; color: #e6b352; text-decoration: none; }
+  .legal-page a.back:hover { text-decoration: underline; }
+  .legal-meta { color: #888; font-size: .85rem; }
+</style>
+</head>
+<body data-theme="dark">
+  <main class="legal-page">
+    <h1>Privacy Policy</h1>
+    <p class="legal-meta">Last updated: <span id="updated"></span></p>
+
+    <h2>1. What we collect</h2>
+    <p>When you sign in with Google, we receive your <strong>email address, display name, and profile picture URL</strong>. That's the entire personal-data set we hold for you.</p>
+
+    <h2>2. What we do with it</h2>
+    <ul>
+      <li>Identify you on return visits so your plan and history are restored.</li>
+      <li>Send you the rare service email if your account requires action.</li>
+      <li>Aggregate, anonymised usage counts to improve the product.</li>
+    </ul>
+
+    <h2>3. What we never do</h2>
+    <ul>
+      <li>We do <strong>not</strong> sell, rent, or trade your data with third parties.</li>
+      <li>We do <strong>not</strong> read, store, or transmit the contents of any PDF, Word, or image file you process. Files are deleted from disk the moment your request finishes.</li>
+      <li>We do <strong>not</strong> use your data to train AI models.</li>
+    </ul>
+
+    <h2>4. Cookies / local storage</h2>
+    <p>We store a small JSON blob in your browser's <code>localStorage</code> called <code>hope.user</code> that holds your verified profile so you don't have to sign in on every visit. Clear it any time from your browser settings.</p>
+
+    <h2>5. Files on the server</h2>
+    <p>Uploaded files are written to a temporary directory, processed, returned to you, and deleted in the response close handler. We do not back them up, archive them, or read them after the response.</p>
+
+    <h2>6. Contact</h2>
+    <p>Questions? Email <a href="mailto:hopepdfofficial@gmail.com">hopepdfofficial@gmail.com</a>.</p>
+
+    <a class="back" href="/">← Back to HOPE PDF</a>
+  </main>
+  <script>document.getElementById('updated').textContent = new Date().toISOString().slice(0, 10);</script>
+</body>
+</html>

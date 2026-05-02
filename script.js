@@ -754,21 +754,14 @@
       planBadge.textContent = p === 'free' ? 'Free' : label;
       planBadge.dataset.plan = p;
 
-      // Upgrade button — visible only for free users (premium hides it).
-      // Use both `hidden` attribute and inline style so cached CSS or
-      // late renders can't bring the pill back.
+      // SOFT-LAUNCH: payments are off and every signed-in user is
+      // premium → the Upgrade button is hidden in every state.
       const isPrem = p !== 'free';
       upgradeBtn.dataset.plan = p;
-      upgradeBtn.textContent  = 'Upgrade';
-      upgradeBtn.disabled     = false;
       upgradeBtn.classList.remove('is-gold');
-      if (isPrem) {
-        upgradeBtn.setAttribute('hidden', '');
-        upgradeBtn.style.display = 'none';
-      } else {
-        upgradeBtn.removeAttribute('hidden');
-        upgradeBtn.style.display = '';
-      }
+      upgradeBtn.setAttribute('hidden', '');
+      upgradeBtn.style.display = 'none';
+      void isPrem; // kept so re-enabling billing only flips this block back
 
       if (u) {
         const initial = (u.name || u.email || '?').trim().charAt(0).toUpperCase();
@@ -834,7 +827,8 @@
         // can change plan / see status. Keeps logic in one place.
         $('#manageAccountBtn').addEventListener('click', () => {
           closePopup();
-          openPricingModal();
+          // SOFT-LAUNCH: pricing UI is hidden — friendly toast instead.
+          toast('info', 'You\'re on Premium', 'All features are unlocked during soft-launch.');
         });
 
         // Sign out — clear the verified user and reload (per spec).
@@ -847,7 +841,7 @@
         // Signed out → single custom gold "Continue with Google" button.
         // Click → server-side OAuth redirect (handled by passport at
         // GET /auth/google → /auth/google/callback → ?token= back).
-        const BACKEND = 'https://hopepdf-api.onrender.com';
+        const BACKEND = 'https://hopepdf.onrender.com';
         authSlot.innerHTML = `
           <button id="googleLoginBtn" type="button" class="gold-google-btn" aria-label="Sign in with Google">
             <img src="https://developers.google.com/identity/images/g-logo.png" alt="" width="18" height="18" />
@@ -864,7 +858,10 @@
     // GIS may finish loading after first paint — re-render the button then.
     setTimeout(syncBadgeAndSlot, 1500);
 
-    upgradeBtn.addEventListener('click', openPricingModal);
+    // SOFT-LAUNCH: payments off — Upgrade button is hidden anyway.
+    // upgradeBtn.addEventListener('click', openPricingModal);
+    upgradeBtn.addEventListener('click', () =>
+      toast('info', 'You\'re on Premium', 'All features are free during soft-launch.'));
 
     function openPricingModal() {
       const u = window.HopeAuth.getUser();

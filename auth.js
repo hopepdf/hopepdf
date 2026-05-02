@@ -19,9 +19,11 @@
 window.HopeAuth = (() => {
   // ---------- CONFIG --------------------------------------------------
   const GOOGLE_CLIENT_ID  = '165450201442-6f6ls3vsn41r5qlk3v5089pro7h0l625.apps.googleusercontent.com';
+  // SOFT-LAUNCH: payments disabled — Razorpay constants kept only for
+  // future re-enablement. startCheckout() is short-circuited below.
   const RAZORPAY_KEY_ID   = 'rzp_test_REPLACE_ME';
   const VERIFY_ENDPOINT   = '/api/razorpay/verify';
-  const BACKEND_URL       = 'https://hopepdf-api.onrender.com';
+  const BACKEND_URL       = 'https://hopepdf.onrender.com';
 
   const PLANS = {
     free:              { label: 'Free',            maxFileBytes: 20  * 1024 * 1024, hourlyQuota: 5,   dailyQuota: 8,   ads: true,  priceInr: 0    },
@@ -148,8 +150,15 @@ window.HopeAuth = (() => {
     saveUser(u);
   }
 
-  // ---------- Razorpay flow ------------------------------------------
-  function startCheckout(planKey) {
+  // ---------- Razorpay flow (DISABLED for soft-launch) ---------------
+  // Every signed-in user is treated as Premium server-side, so the
+  // checkout flow is short-circuited. The body is preserved (commented)
+  // so re-enabling billing is a single-block uncomment.
+  function startCheckout(/* planKey */) {
+    return Promise.reject(new Error('Payments are disabled during soft-launch. Sign in with Google for full access.'));
+  }
+  /* ── original Razorpay flow — re-enable by removing this block wrapper ──
+  function _startCheckout_disabled(planKey) {
     return new Promise((resolve, reject) => {
       const cfg = PLANS[planKey];
       if (!cfg || !cfg.priceInr) return reject(new Error('Unknown plan.'));
@@ -200,6 +209,7 @@ window.HopeAuth = (() => {
       rzp.open();
     });
   }
+  ── end of original Razorpay flow ── */
 
   return {
     PLANS,

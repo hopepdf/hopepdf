@@ -35,20 +35,20 @@ function upsert({ email, name, picture }) {
   const all = readAll();
   const existing = all[email];
   const now = Date.now();
+  // SOFT-LAUNCH: every authenticated user is premium until billing is
+  // re-enabled. Plan + expiresAt are forced regardless of prior state.
+  // Re-enable real billing by reverting the next two lines to:
+  //   plan: (existing && existing.plan) || 'free',
+  //   expiresAt: (existing && existing.expiresAt) || null,
   const user = {
     email,
     name: name || (existing && existing.name) || email,
     picture: picture || (existing && existing.picture) || null,
-    plan: (existing && existing.plan) || 'free',
-    expiresAt: (existing && existing.expiresAt) || null,
+    plan: 'premium',         // <-- soft-launch override
+    expiresAt: null,         // <-- soft-launch override (never expires)
     createdAt: (existing && existing.createdAt) || now,
     updatedAt: now
   };
-  // Auto-downgrade if subscription expired.
-  if (user.expiresAt && now > user.expiresAt && user.plan !== 'free') {
-    user.plan = 'free';
-    user.expiresAt = null;
-  }
   all[email] = user;
   writeAll(all);
   return user;

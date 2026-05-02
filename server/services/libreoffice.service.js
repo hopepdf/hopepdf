@@ -137,34 +137,57 @@ function convert(inputPath, outputDir, targetFormat) {
 }
 
 /**
- * PDF → DOCX with automatic engine selection.
- *   1) Python pdf2docx (PRIMARY) — preserves real text + tables much
- *      more reliably than LibreOffice. Accuracy beats speed here.
- *   2) LibreOffice (FALLBACK) — only used if pdf2docx is unavailable
- *      or fails outright.
- *   3) Throws NO_CONVERTER if neither is installed.
+ * PDF → DOCX with strict engine priority.
+ *   1) Python pdf2docx (PRIMARY) — selectable text + real tables.
+ *   2) LibreOffice (FALLBACK)    — only if pdf2docx errors out.
+ *   3) NO_CONVERTER              — neither engine present.
  *
- * Matches the spec's named export.
+ * Output is sanity-checked: if it's larger than 50 MB AND > 5× the
+ * input size, that's a smell of an image-based DOCX leaking through —
+ * we log a warning so it's easy to spot in production logs.
  */
 async function convertPdfToDocx(inputPath, outputDir) {
-  // 1) Primary: pdf2docx
+  let outPath = null;
+
+  // 1) PRIMARY — pdf2docx
   if (await isPythonFallbackAvailable()) {
     try {
-      return await runSerial(() => rawPython(inputPath, outputDir));
+      console.log('[pdf→docx] Using engine: pdf2docx');
+      outPath = await runSerial(() => rawPython(inputPath, outputDir));
     } catch (err) {
-      // pdf2docx threw — try LibreOffice as a fallback.
-      console.warn('pdf2docx failed, falling back to LibreOffice:', err.message);
+      console.warn('[pdf→docx] pdf2docx failed, falling back to LibreOffice:', err.message);
+      outPath = null;
     }
   }
 
-  // 2) Fallback: LibreOffice
-  if (await isAvailable()) {
-    return runSerial(() => rawSoffice(inputPath, outputDir, 'docx'));
+  // 2) FALLBACK — LibreOffice (only when pdf2docx wasn't usable)
+  if (!outPath) {
+    if (await isAvailable()) {
+      console.log('[pdf→docx] Using fallback: LibreOffice');
+      outPath = await runSerial(() => rawSoffice(inputPath, outputDir, 'docx'));
+    } else {
+      const err = new Error('No PDF→DOCX engine available. Install pdf2docx (pip install pdf2docx) or LibreOffice (apt-get install libreoffice-core libreoffice-writer).');
+      err.code = 'NO_CONVERTER';
+      throw err;
+    }
   }
 
-  const err = new Error('No PDF→DOCX engine available. Install pdf2docx (pip install pdf2docx) or LibreOffice (apt-get install libreoffice-core libreoffice-writer).');
-  err.code = 'NO_CONVERTER';
-  throw err;
+  // 3) Output sanity check — flag suspiciously large DOCX (image-heavy)
+  try {
+    const [outStat, inStat] = await Promise.all([
+      fs.promises.stat(outPath),
+      fs.promises.stat(inputPath)
+    ]);
+    const outMb = outStat.size / 1024 / 1024;
+    const ratio = inStat.size > 0 ? outStat.size / inStat.size : 0;
+    if (outMb > 50 && ratio > 5) {
+      console.warn(`[pdf→docx] WARN — DOCX is ${outMb.toFixed(1)}MB (${ratio.toFixed(1)}× input). May be image-heavy; check engine output.`);
+    } else {
+      console.log(`[pdf→docx] OK — ${outMb.toFixed(2)}MB (${ratio.toFixed(2)}× input)`);
+    }
+  } catch (_) { /* stat failure is non-fatal */ }
+
+  return outPath;
 }
 
 module.exports = {

@@ -25,7 +25,9 @@ const authRoutes    = require('./routes/auth.routes');
 const pdfRoutes     = require('./routes/pdf.routes');
 const wordRoutes    = require('./routes/word.routes');
 const imageRoutes   = require('./routes/image.routes');
-const paymentRoutes = require('./routes/payment.routes');
+// SOFT-LAUNCH: payments disabled. Re-enable by uncommenting the require
+// and the app.use('/payment', …) below.
+// const paymentRoutes = require('./routes/payment.routes');
 
 const app = express();
 app.disable('x-powered-by');
@@ -56,7 +58,7 @@ app.use('/auth',    authRoutes);
 app.use('/pdf',     pdfRoutes);
 app.use('/word',    wordRoutes);
 app.use('/image',   imageRoutes);
-app.use('/payment', paymentRoutes);
+// app.use('/payment', paymentRoutes);  // disabled for soft-launch
 
 // 404 + central error handler (also cleans uploaded files)
 app.use(notFound);

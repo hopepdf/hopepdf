@@ -4,10 +4,12 @@
  *   split       — every page → its own PDF
  *   compress    — re-render pages to JPEG, embed back (lossy, real shrink)
  *   toJpg       — every page → JPEG (zip in controller)
- *   toWord      — every page → PNG → DOCX ImageRun (layout preserved)
+ *   toWord      — pdf-parse text-layer probe → pdf2docx (PRIMARY) →
+ *                 LibreOffice (FALLBACK). NEVER renders pages as images
+ *                 for the DOCX. Real text + real tables guaranteed.
  *
- *   Uses pdfjs-dist legacy build + node-canvas for raster operations.
- *   Both ship as well-known npm packages; works on Render out of the box.
+ *   Uses pdfjs-dist legacy build + node-canvas only for raster
+ *   operations (compress, toJpg). The Word path uses neither.
  */
 const fs = require('fs');
 const path = require('path');
@@ -132,7 +134,7 @@ async function toWord(filePath) {
   }
 
   // 2) Real conversion. convertPdfToDocx auto-selects:
-  //      LibreOffice (preferred) → Python pdf2docx (fallback) → error.
+  //      pdf2docx (PRIMARY) → LibreOffice (FALLBACK) → throw NO_CONVERTER
   //    Internally serialised to one job at a time across the process.
   const outDir = path.join(path.dirname(filePath), `out-${Date.now()}`);
   return await libreoffice.convertPdfToDocx(filePath, outDir);
