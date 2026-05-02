@@ -41,12 +41,31 @@ function isAvailable() {
 
 function isPythonFallbackAvailable() {
   if (cachedPython !== null) return Promise.resolve(cachedPython);
+  // Use the actual CLI form we'll invoke — this guarantees that the
+  // exact command used at request time is installed, not just the
+  // module import path. Logs once so missing pdf2docx is obvious.
   return new Promise((resolve) => {
-    exec('python3 -c "import pdf2docx" 2>/dev/null', (err) => {
+    exec('python3 -m pdf2docx --help', (err, stdout) => {
       cachedPython = !err;
+      if (cachedPython) console.log('[converters] pdf2docx ✓');
+      else              console.warn('[converters] pdf2docx ✗ — install with: pip3 install --break-system-packages pdf2docx');
       resolve(cachedPython);
     });
   });
+}
+
+/**
+ * Boot-time verification — call once from server.js so the operator
+ * immediately sees in the logs whether each engine is wired up.
+ * Never throws — just logs.
+ */
+async function verifyConverters() {
+  const [soffice, py] = await Promise.all([isAvailable(), isPythonFallbackAvailable()]);
+  console.log('[converters] LibreOffice (soffice):', soffice ? '✓ available' : '✗ missing');
+  console.log('[converters] pdf2docx (python3):',  py      ? '✓ available' : '✗ missing');
+  if (!soffice && !py) {
+    console.error('[converters] ⚠️  No PDF→DOCX engine available — /pdf/to-word will return 503 NO_CONVERTER on every request.');
+  }
 }
 
 /* ────────────────────── serial queue ──────────────────────────── */
@@ -151,6 +170,7 @@ async function convertPdfToDocx(inputPath, outputDir) {
 module.exports = {
   isAvailable,
   isPythonFallbackAvailable,
+  verifyConverters,
   convert,
   convertPdfToDocx
 };

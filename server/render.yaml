@@ -4,16 +4,11 @@ services:
     name: hope-pdf-server
     env: node
     rootDir: server
-    # PDF → DOCX uses pdf2docx as the PRIMARY engine (preserves real text +
-    # tables). LibreOffice is the fallback for files pdf2docx can't parse.
-    # Render base images are Debian — apt-get + pip3 are available at build.
-    buildCommand: |
-      apt-get update && \
-      apt-get install -y --no-install-recommends \
-        python3 python3-pip \
-        libreoffice-core libreoffice-writer && \
-      pip3 install --break-system-packages pdf2docx && \
-      npm install
+    # All system + Python deps live in install.sh (set -e + verification).
+    # If pdf2docx fails to install, the build fails fast — never silently.
+    # If your Render plan blocks apt-get at build time, switch to a
+    # Dockerfile-based service and copy install.sh into the image.
+    buildCommand: bash ./install.sh && npm install
     startCommand: npm start
     healthCheckPath: /healthz
     autoDeploy: true

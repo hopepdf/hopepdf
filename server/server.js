@@ -63,4 +63,14 @@ app.use(notFound);
 app.use(errorHandler);
 
 const port = env.PORT;
-app.listen(port, () => logger.info(`H🌸PE server listening on :${port}`));
+app.listen(port, async () => {
+  logger.info(`H🌸PE server listening on :${port}`);
+  // Boot-time converter probe — logs which PDF→Word engines are wired up
+  // so a missing pdf2docx install is loud, not silent.
+  try {
+    const { verifyConverters } = require('./services/libreoffice.service');
+    await verifyConverters();
+  } catch (e) {
+    logger.error('verifyConverters failed:', e.message);
+  }
+});
