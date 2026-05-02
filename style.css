@@ -2068,7 +2068,8 @@ body[data-theme="light"] .plan-badge   { background: rgba(0, 0, 0, .05); border-
 body[data-theme="light"] .user-chip    { background: rgba(0, 0, 0, .04); border-color: rgba(0, 0, 0, .12); color: #1f2433; }
 
 /* ================================================================
-   Navbar logo — inline flower SVG + text (no external image)
+   Navbar logo — dark round badge + "H🌸PE PDF" wordmark
+   (matches the brand image; inline SVG, no external file)
    ================================================================ */
 .brand.logo {
   display: inline-flex;
@@ -2077,22 +2078,31 @@ body[data-theme="light"] .user-chip    { background: rgba(0, 0, 0, .04); border-
   text-decoration: none;
   line-height: 1;
 }
-.logo-icon {
-  width: 32px; height: 32px;
-  display: block;
-  filter: drop-shadow(0 0 8px rgba(255, 200, 100, .55));
+.brand.logo .brand-mark {
+  width: 36px; height: 36px;
+  display: inline-grid; place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #1f1320, #08060a 70%);
+  box-shadow: 0 0 14px rgba(255, 200, 100, .35), inset 0 0 0 1px rgba(255, 200, 100, .25);
 }
-.logo-text {
-  font-weight: 700;
-  font-size: 18px;
+.brand.logo .brand-mark-svg {
+  width: 26px; height: 26px;
+  filter: drop-shadow(0 0 6px rgba(255, 200, 100, .55));
+}
+.brand.logo .brand-title {
+  font-family: var(--font-sans, "Inter", system-ui, sans-serif);
+  font-weight: 800;
+  font-size: 20px;
   letter-spacing: .3px;
-  color: #fff;
   background: linear-gradient(90deg, #ffd9b5, #e6b352);
   -webkit-background-clip: text;
           background-clip: text;
   -webkit-text-fill-color: transparent;
+  color: transparent;
 }
-body[data-theme="light"] .logo-text { color: #1a0f14; }
+body[data-theme="light"] .brand.logo .brand-mark {
+  background: radial-gradient(circle at 30% 30%, #fff, #f1e6da 70%);
+}
 
 /* ================================================================
    Account dropdown — Google-style profile button + popup card

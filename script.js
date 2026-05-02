@@ -754,12 +754,13 @@
       planBadge.textContent = p === 'free' ? 'Free' : label;
       planBadge.dataset.plan = p;
 
-      // Upgrade button — gold + disabled when already premium
+      // Upgrade button — visible only for free users (premium hides it).
       const isPrem = p !== 'free';
-      upgradeBtn.dataset.plan = p;
-      upgradeBtn.textContent  = isPrem ? '★ Premium' : 'Upgrade';
-      upgradeBtn.disabled     = isPrem;
-      upgradeBtn.classList.toggle('is-gold', isPrem);
+      upgradeBtn.dataset.plan  = p;
+      upgradeBtn.textContent   = 'Upgrade';
+      upgradeBtn.disabled      = false;
+      upgradeBtn.style.display = isPrem ? 'none' : '';
+      upgradeBtn.classList.remove('is-gold');
 
       if (u) {
         const initial = (u.name || u.email || '?').trim().charAt(0).toUpperCase();
@@ -840,9 +841,9 @@
         // GET /auth/google → /auth/google/callback → ?token= back).
         const BACKEND = 'https://hopepdf-api.onrender.com';
         authSlot.innerHTML = `
-          <button id="googleLoginBtn" type="button" class="gold-google-btn" aria-label="Continue with Google">
+          <button id="googleLoginBtn" type="button" class="gold-google-btn" aria-label="Sign in with Google">
             <img src="https://developers.google.com/identity/images/g-logo.png" alt="" width="18" height="18" />
-            <span>Continue with Google</span>
+            <span>Sign in</span>
           </button>`;
         $('#googleLoginBtn').addEventListener('click', () => {
           window.location.href = `${BACKEND}/auth/google`;

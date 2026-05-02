@@ -284,12 +284,18 @@
   <!-- ─────────── HEADER ─────────── -->
   <header class="nav" id="nav">
     <div class="nav-inner">
-      <!-- Logo: inline SVG (no external file → never shows broken-image "?"). -->
+      <!-- Logo: dark round badge with flower icon + "H🌸PE PDF" wordmark
+           where the central O is the flower. Inline SVG only — no external
+           image to 404 in production. -->
       <a href="#home" class="brand logo" data-link aria-label="HOPE PDF">
-        <svg class="logo-icon" viewBox="0 0 100 100" aria-hidden="true">
-          <use href="#hope-flower"/>
-        </svg>
-        <span class="logo-text">HOPE PDF</span>
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 100 100" class="brand-mark-svg"><use href="#hope-flower"/></svg>
+        </span>
+        <span class="brand-title">
+          H<span class="brand-flower" aria-hidden="true">
+            <svg class="hope-flower-svg" viewBox="0 0 100 100"><use href="#hope-flower"/></svg>
+          </span>PE&nbsp;PDF
+        </span>
       </a>
 
       <nav class="nav-links" aria-label="Primary">

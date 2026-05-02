@@ -92,19 +92,13 @@ function rawSoffice(inputPath, outputDir, targetFormat) {
 /* ────────────────────── optional Python fallback ──────────────── */
 // Higher fidelity than LibreOffice for PDF → DOCX in some edge cases.
 // Used only if LibreOffice isn't installed.
+// Uses the pdf2docx CLI form ("python3 -m pdf2docx convert in out").
 function rawPython(inputPath, outputDir) {
   return new Promise((resolve, reject) => {
     fs.mkdirSync(outputDir, { recursive: true });
     const base = path.basename(inputPath).replace(/\.[a-z0-9]+$/i, '');
     const out  = path.join(outputDir, `${base}.docx`);
-    const py = `
-import sys
-from pdf2docx import Converter
-cv = Converter(sys.argv[1])
-cv.convert(sys.argv[2], start=0, end=None)
-cv.close()
-`;
-    const cmd = `python3 -c '${py.replace(/'/g, "'\\''")}' "${inputPath.replace(/"/g, '\\"')}" "${out.replace(/"/g, '\\"')}"`;
+    const cmd  = `python3 -m pdf2docx convert "${inputPath.replace(/"/g, '\\"')}" "${out.replace(/"/g, '\\"')}"`;
     exec(cmd, { timeout: TIMEOUT_MS * 2 }, (err, _stdout, stderr) => {
       if (err) return reject(new Error(`pdf2docx failed: ${err.message || stderr || 'unknown'}`));
       if (!fs.existsSync(out)) return reject(new Error('pdf2docx produced no output.'));
@@ -124,21 +118,32 @@ function convert(inputPath, outputDir, targetFormat) {
 }
 
 /**
- * PDF → DOCX with automatic engine selection:
- *   1) LibreOffice if available (preferred — wide format support)
- *   2) Python pdf2docx if soffice missing but python+pdf2docx present
- *   3) Throws a clear error otherwise
+ * PDF → DOCX with automatic engine selection.
+ *   1) Python pdf2docx (PRIMARY) — preserves real text + tables much
+ *      more reliably than LibreOffice. Accuracy beats speed here.
+ *   2) LibreOffice (FALLBACK) — only used if pdf2docx is unavailable
+ *      or fails outright.
+ *   3) Throws NO_CONVERTER if neither is installed.
  *
  * Matches the spec's named export.
  */
 async function convertPdfToDocx(inputPath, outputDir) {
+  // 1) Primary: pdf2docx
+  if (await isPythonFallbackAvailable()) {
+    try {
+      return await runSerial(() => rawPython(inputPath, outputDir));
+    } catch (err) {
+      // pdf2docx threw — try LibreOffice as a fallback.
+      console.warn('pdf2docx failed, falling back to LibreOffice:', err.message);
+    }
+  }
+
+  // 2) Fallback: LibreOffice
   if (await isAvailable()) {
     return runSerial(() => rawSoffice(inputPath, outputDir, 'docx'));
   }
-  if (await isPythonFallbackAvailable()) {
-    return runSerial(() => rawPython(inputPath, outputDir));
-  }
-  const err = new Error('No PDF→DOCX engine available. Install LibreOffice (apt-get install libreoffice-core libreoffice-writer) or pip install pdf2docx.');
+
+  const err = new Error('No PDF→DOCX engine available. Install pdf2docx (pip install pdf2docx) or LibreOffice (apt-get install libreoffice-core libreoffice-writer).');
   err.code = 'NO_CONVERTER';
   throw err;
 }
